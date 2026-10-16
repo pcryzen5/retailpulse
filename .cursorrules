@@ -1,0 +1,73 @@
+# RetailPulse — AI assistant rules
+
+You are helping build RetailPulse: an AI-powered customer analytics and demand forecasting platform
+(demand forecasting, customer segmentation, churn prediction, inventory optimization) with a FastAPI
+API, a Streamlit dashboard, MLflow, Prefect and PostgreSQL. Python 3.11, managed with uv.
+
+## Source of truth (read the relevant doc before coding; do not guess)
+- docs/PRD.md what and why | docs/TRD.md how, formulas, budgets | docs/ARCHITECTURE.md structure, boundaries
+- docs/DATABASE.md schema | docs/API.md endpoints | docs/DESIGN.md + docs/APP_FLOW.md UI and flows
+- docs/TESTING.md | docs/SECURITY.md | docs/CODE_STYLE.md | docs/IMPLEMENTATION_PLAN.md (task list) | docs/PHASES.md
+- If docs conflict, stop and ask. Precedence: SECURITY > DATABASE/API > TRD > ARCHITECTURE > PRD.
+
+## How to work
+- Work on ONE task ID from docs/IMPLEMENTATION_PLAN.md at a time. Propose a short plan first if it touches
+  more than ~5 files or changes a contract (DB schema, API, config, security).
+- Write tests alongside the code (tests first for pure logic). Run the task's Verify command and
+  `make lint typecheck test` before saying you are done. Tick the task's checkbox.
+- Keep diffs small and focused. No unrelated refactors, renames or formatting churn.
+- Conventional Commits with the task ID: `feat(forecasting): add LightGBM forecaster (P2-06)`.
+
+## Ask before you
+- add or upgrade a dependency; change DB schema, API contracts, config variables or security settings;
+- delete files; run anything that costs money or calls an external service; expose a port.
+
+## Python rules
+- Fully typed (mypy strict on src/), Google-style docstrings on public items, ruff-clean, 100 columns.
+- Absolute imports only. Heavy libraries (torch, prophet, lightgbm, shap, evidently, mlflow, prefect) are
+  imported lazily inside the modules that need them, never in __init__.py (keeps API/dashboard images light).
+- Domain exceptions from retailpulse/errors.py; no bare except; no print; use structlog with key-value fields.
+- Read environment variables ONLY in retailpulse/config.py (pydantic-settings, prefix RP_).
+- Small pure functions; I/O at the edges. No mutable defaults, no module-level mutable state.
+- FastAPI endpoints are plain `def` with sync SQLAlchemy 2.0. Routers are thin; no SQL or business logic in them.
+
+## Data and ML rules
+- NEVER call date.today() or datetime.now() in ml/, features/ or etl/. Pass `as_of`/`origin`. Data's latest
+  date is `data_as_of`. Only retailpulse/timeutil.py reads the clock.
+- Time-based splits only. Features are pure functions of (data, cutoff). Fit scalers/encoders/calibrators on
+  training data only. Churn uses purged temporal splits (TRD §5.3).
+- Seeds come from Settings.seed. Log params, metrics, artifacts, git SHA, dataset hash to MLflow.
+- Forecast models implement the `Forecaster` protocol; metrics live in ml/forecasting/metrics.py only.
+- A model is promotable only if it passes the champion gate (beats seasonal naive on WAPE). Never auto-promote
+  unless RP_AUTO_PROMOTE=true. Report results honestly, including when baselines win.
+- Inventory parameters in the dataset are SYNTHETIC; always keep source='synthetic' and show the caveat.
+- Real-data quirks of Online Retail II (sheet overlap, partial last day, outliers, SKU case, closures) are in docs/TRD.md §4: read them before touching the ETL.
+
+## Database and API rules
+- Schema changes only through Alembic revisions with a working downgrade; keep DATABASE.md in sync.
+- SQL only via SQLAlchemy or text() with bound parameters. No string-built SQL.
+- API reads predictions through the ml.v_active_* views. Every endpoint has a response_model, uses
+  require_role(...), appears in the RBAC test matrix and in docs/API.md. Errors are RFC 9457 problem responses.
+- The dashboard talks only to the API (never the DB or ML code). Never pass API strings to unsafe_allow_html.
+
+## Security rules (non-negotiable; see docs/SECURITY.md)
+- No hard-coded or default credentials; secrets only from env as SecretStr; never log tokens, secrets or customer_key.
+- Pseudonymize customer IDs with HMAC at ingestion. Never store names, emails, phones or addresses.
+- Validate all input with Pydantic (extra="forbid"); validate uploads (size, type, magic bytes, headers).
+- No eval/exec/pickle.loads/yaml.load/shell=True on external data. No user-supplied URL fetching.
+- Do not disable auth, TLS verification, XSRF protection or validation, even temporarily.
+- Never publish Postgres, MLflow or Prefect ports in production compose files.
+
+## Testing rules
+- pytest markers: unit, integration, e2e, ml, slow. No network or sleeps in unit tests.
+- Use a real PostgreSQL in integration tests; do not mock the database.
+- Never weaken or skip a failing test to get green. Fix the cause or ask.
+- Every bug fix starts with a failing regression test.
+
+## Commands
+make setup | up | down | migrate | seed | etl | train | score | api | dashboard
+make lint | fmt | typecheck | test | test-unit | test-int | e2e | cov | security
+
+## Output style
+- Be concise. Show a short summary of test results (full output only for failures).
+- State assumptions explicitly and list files changed. If something is ambiguous, ask one focused question.
