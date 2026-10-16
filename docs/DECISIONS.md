@@ -18,3 +18,9 @@ Format: Date, Decision, Context/Reason, Consequences.
 - **Decision:** Configured `pyproject.toml` with `uv` dependency groups: `core`, `ml`, `api`, `dashboard`, and `dev` targeting Python 3.11. Pinned code quality tools to Ruff (100-character line length, banned APIs for system clock), strict Mypy, and Pytest with 80% minimum coverage.
 - **Context/Reason:** Fulfills TRD §1, TRD §3, CODE_STYLE §1, and ARCHITECTURE §4 light-image constraints.
 - **Consequences:** Heavy ML dependencies are isolated from lightweight API and dashboard runtime contexts.
+
+### 2026-10-16: DEC-003 - Package Skeleton, Error Hierarchy, and Clock Isolation
+- **Date:** 2026-10-16
+- **Decision:** Implemented `src/retailpulse/{config,logging,errors,timeutil}.py`. `config.Settings` enforces all TRD §3 parameters, fails on prod if secrets < 32 bytes or placeholders. `errors.py` defines domain exception taxonomy mapped to RFC 9457. `logging.py` standardizes structlog JSON output with request_id contextvar. `timeutil.utc_now()` is designated as the sole system clock interface.
+- **Context/Reason:** Establishes predictable domain error handling, structured telemetry, and prevents temporal data leakage across ETL and ML components.
+- **Consequences:** All subsequent domain modules inherit from `RetailPulseError` and accept explicit temporal cutoffs (`as_of`) instead of querying the system clock.
