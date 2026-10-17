@@ -71,7 +71,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 ### Phase 0 — Foundations
 - [x] **P0-01 Repo and tooling.** `pyproject.toml` (uv dependency groups `core`, `ml`, `api`, `dashboard`, `dev`; ruff, mypy, pytest, coverage settings from CODE_STYLE and TESTING), `.gitignore`, `.editorconfig`, `.pre-commit-config.yaml` (ruff, ruff-format, gitleaks, large-file check), README stub. *Verify:* `uv sync && uv run pre-commit run --all-files`.
 - [x] **P0-02 Package skeleton.** `src/retailpulse/{__init__,config,logging,errors,timeutil}.py`. `Settings` implements TRD §3 (prod requires secrets ≥ 32 bytes); structlog JSON with `request_id` contextvar; exception hierarchy; `timeutil.utc_now()` as the only clock access. *Verify:* `pytest tests/unit/test_config.py`.
-- [ ] **P0-03 Makefile.** Targets in Appendix A; `make help` lists them. *Verify:* `make help && make lint typecheck test`.
+- [x] **P0-03 Makefile.** Targets in Appendix A; `make help` lists them. *Verify:* `make help && make lint typecheck test`.
 - [ ] **P0-04 CLI skeleton.** Typer app `retailpulse` with `version`; entry point in `pyproject.toml`. *Verify:* `uv run retailpulse --help`.
 - [ ] **P0-05 Dockerfiles.** `infra/docker/{api,dashboard,worker,mlflow}.Dockerfile`: multi-stage, non-root user, pinned base tags, healthchecks; API and dashboard images exclude heavy ML groups. *Verify:* `docker build` each; `docker run --rm <img> id` shows non-root.
 - [ ] **P0-06 Compose.** `docker-compose.yml` with `postgres` (init script creates DBs `retailpulse`, `mlflow`, `prefect` and roles per DATABASE §10), `mlflow`, `prefect`; healthchecks, named volumes, internal network; `.env.example`. *Verify:* `make up` then `curl -fs localhost:5000` and Prefect health.
