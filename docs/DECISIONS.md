@@ -30,3 +30,9 @@ Format: Date, Decision, Context/Reason, Consequences.
 - **Decision:** Created cross-platform `Makefile` supporting all 21 targets from Appendix A (`help`, `setup`, `lint`, `fmt`, `typecheck`, `test`, etc.) with dynamic self-documentation. Configured subpackage stubs across all architectural layers with `import-linter` contract verification.
 - **Context/Reason:** Fulfills Appendix A and enforces module dependency rules from `docs/ARCHITECTURE.md` §4 during CI and local development.
 - **Consequences:** Standardized developer workflow across environments with automated verification of layer isolation and temporal clock boundaries.
+
+### 2026-10-20: DEC-005 - Typer CLI Architecture and Extensible Command Structure
+- **Date:** 2026-10-20
+- **Decision:** Implemented Typer CLI application in `src/retailpulse/cli.py` with eager `--version` flag and explicit `version` command, registered via `[project.scripts]` in `pyproject.toml`.
+- **Context/Reason:** Fulfills task P0-04 and Appendix B CLI command specifications, providing a consistent operational interface for local development, CI/CD, and scheduled worker tasks.
+- **Consequences:** Future command groups (`db`, `users`, `etl`, `inventory`, `train`, `score`, `monitor`, `replay`) will register directly onto this Typer app.
