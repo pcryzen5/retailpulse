@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+.env
+.env.*
+!.env.example
+data/
+*.parquet
+online_retail_II.xlsx
+tests/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+retailpulse-spec (1)/

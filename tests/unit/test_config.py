@@ -131,11 +131,11 @@ def test_logging_and_request_id() -> None:
     token = bind_request_id("test-req-123")
     try:
         event: dict[str, object] = {"event": "test"}
-        processed = add_request_id(None, "info", event)  # type: ignore[arg-type]
+        processed = add_request_id(None, "info", event)
         assert processed["request_id"] == "test-req-123"
     finally:
         reset_request_id(token)
 
     event2: dict[str, object] = {"event": "test2"}
-    processed2 = add_request_id(None, "info", event2)  # type: ignore[arg-type]
+    processed2 = add_request_id(None, "info", event2)
     assert "request_id" not in processed2
