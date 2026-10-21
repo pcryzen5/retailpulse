@@ -1,0 +1,20 @@
+# Explicit list of non-product SKUs (TRD §4.3 rule 4)
+# Never match by pattern. DCGS* codes are real products and must be kept.
+non_product_skus:
+  - "POST"
+  - "DOT"
+  - "M"
+  - "C2"
+  - "D"
+  - "S"
+  - "BANK CHARGES"
+  - "ADJUST"
+  - "AMAZONFEE"
+  - "PADS"
+  - "CRUK"
+  - "TEST001"
+  - "gift_0001_10"
+  - "gift_0001_20"
+  - "gift_0001_30"
+  - "gift_0001_40"
+  - "gift_0001_50"

@@ -88,7 +88,7 @@ ignore = ["ANN401", "PLR0913", "PLR2004"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "ANN", "ARG", "PLR2004", "S105", "S106"]
-"scripts/**" = ["T20"]
+"scripts/**" = ["T20", "PLR0915", "S311", "DTZ001"]
 "migrations/**" = ["N999", "ANN"]
 "src/retailpulse/timeutil.py" = ["TID251"]
 
@@ -121,6 +121,7 @@ ignore_missing_imports = true
 minversion = "8.0"
 addopts = "-ra --strict-markers --strict-config"
 testpaths = ["tests"]
+pythonpath = [".", "src"]
 markers = [
     "unit: fast tests without external services",
     "integration: needs PostgreSQL",
