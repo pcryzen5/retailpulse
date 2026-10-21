@@ -75,7 +75,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P0-04 CLI skeleton.** Typer app `retailpulse` with `version`; entry point in `pyproject.toml`. *Verify:* `uv run retailpulse --help`.
 - [x] **P0-05 Dockerfiles.** `infra/docker/{api,dashboard,worker,mlflow}.Dockerfile`: multi-stage, non-root user, pinned base tags, healthchecks; API and dashboard images exclude heavy ML groups. *Verify:* `docker build` each; `docker run --rm <img> id` shows non-root.
 - [x] **P0-06 Compose.** `docker-compose.yml` with `postgres` (init script creates DBs `retailpulse`, `mlflow`, `prefect` and roles per DATABASE §10), `mlflow`, `prefect`; healthchecks, named volumes, internal network; `.env.example`. *Verify:* `make up` then `curl -fs localhost:5000` and Prefect health.
-- [ ] **P0-07 CI skeleton.** `.github/workflows/ci.yml`: uv cache, lint, types, unit tests. *Verify:* green run on a branch.
+- [x] **P0-07 CI skeleton.** `.github/workflows/ci.yml`: uv cache, lint, types, unit tests. *Verify:* green run on a branch.
 - [ ] **P0-08 Import contracts.** `import-linter` config enforcing ARCHITECTURE §4 plus the clock rule (`ml`, `features`, `etl` may not import `timeutil`); wired into `make lint`. *Verify:* a deliberate forbidden import fails `make lint`.
 
 ### Phase 1 — Data layer and ETL
