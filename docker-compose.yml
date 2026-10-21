@@ -1,0 +1,91 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: retailpulse_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: postgres
+      RP_DB_OWNER_PASSWORD: devownerpassword
+      RP_DB_APP_PASSWORD: devpassword
+      MLFLOW_DB_PASSWORD: mlflowpassword
+      PREFECT_DB_PASSWORD: prefectpassword
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - retailpulse_net
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: infra/docker/mlflow.Dockerfile
+    container_name: retailpulse_mlflow
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://mlflow:mlflowpassword@postgres:5432/mlflow
+      MLFLOW_DEFAULT_ARTIFACT_ROOT: /mlflow/artifacts
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://mlflow:mlflowpassword@postgres:5432/mlflow
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - retailpulse_net
+
+  prefect:
+    image: prefecthq/prefect:2.19.0-python3.11
+    container_name: retailpulse_prefect
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_SERVER_API_PORT: 4200
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://prefect:prefectpassword@postgres:5432/prefect
+    ports:
+      - "4200:4200"
+    command: prefect server start
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - retailpulse_net
+
+volumes:
+  postgres_data:
+    name: retailpulse_postgres_data
+  mlflow_artifacts:
+    name: retailpulse_mlflow_artifacts
+
+networks:
+  retailpulse_net:
+    name: retailpulse_net
+    driver: bridge
