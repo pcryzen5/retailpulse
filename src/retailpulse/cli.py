@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 
 import typer
 
 import retailpulse
-from retailpulse.db.session import check_database
+from retailpulse.db.session import check_database, session_scope
 from retailpulse.errors import DatabaseError
+from retailpulse.etl.calendar import ensure_dim_date, ensure_dim_store
 
 app = typer.Typer(
     name="retailpulse",
@@ -86,3 +88,26 @@ def db_check(
 
     if not status["is_up_to_date"]:
         raise typer.Exit(code=1)
+
+
+@db_app.command("seed-calendar")
+def db_seed_calendar(
+    start_year: int = typer.Option(2009, help="Start year for dim_date population."),
+    end_year: int = typer.Option(2013, help="End year for dim_date population."),
+) -> None:
+    """Populate core.dim_date (2009-2013) and seed default store core.dim_store."""
+    start_date = datetime.date(start_year, 1, 1)
+    end_date = datetime.date(end_year, 12, 31)
+    typer.echo(f"Seeding core.dim_date from {start_date} to {end_date}...")
+    try:
+        with session_scope() as session:
+            ensure_dim_store(session)
+            inserted = ensure_dim_date(session, start_date=start_date, end_date=end_date)
+    except Exception as exc:
+        typer.secho(f"Calendar seed failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    typer.secho(
+        f"Calendar seed complete. Inserted {inserted} new date rows.",
+        fg=typer.colors.GREEN,
+    )

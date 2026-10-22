@@ -113,7 +113,7 @@ plugins = ["pydantic.mypy"]
 module = [
     "prophet.*", "lightgbm.*", "shap.*", "mlflow.*", "evidently.*", "plotly.*",
     "streamlit.*", "holidays.*", "sklearn.*", "scipy.*", "statsmodels.*", "torch.*",
-    "pandera.*", "slowapi.*", "prefect.*"
+    "pandera.*", "slowapi.*", "prefect.*", "pandas.*"
 ]
 ignore_missing_imports = true
 
