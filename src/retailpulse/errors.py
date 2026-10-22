@@ -20,6 +20,10 @@ class DomainValidationError(RetailPulseError):
     """Raised when domain entity or input validation fails."""
 
 
+class IngestionError(RetailPulseError):
+    """Raised when file reading, parsing, or adapter transformation fails."""
+
+
 class DataQualityError(RetailPulseError):
     """Raised when data quality checks fail or threshold gates are violated."""
 
