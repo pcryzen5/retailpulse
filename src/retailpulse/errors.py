@@ -46,3 +46,7 @@ class PipelineError(RetailPulseError):
 
 class ModelGateError(RetailPulseError):
     """Raised when a candidate model fails the champion gate."""
+
+
+class DatabaseError(RetailPulseError):
+    """Raised when database operations, connectivity, or migrations fail."""
