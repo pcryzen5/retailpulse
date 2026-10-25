@@ -113,7 +113,7 @@ class PipelineRun(Base):
     trigger: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
     params: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, server_default=text("'{}'::jsonb"), nullable=False
+        JSONB, server_default=text("'{}'"), nullable=False
     )
     prefect_flow_run_id: Mapped[str | None] = mapped_column(String, nullable=True)
     requested_by: Mapped[uuid.UUID | None] = mapped_column(
@@ -146,7 +146,12 @@ class DataQualityResult(Base):
         {"schema": "ops"},
     )
 
-    result_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    result_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        Identity(always=True),
+        primary_key=True,
+        autoincrement=True,
+    )
     batch_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("ops.ingestion_batch.batch_id", ondelete="CASCADE"),
@@ -159,7 +164,7 @@ class DataQualityResult(Base):
         Integer, default=0, server_default="0", nullable=False
     )
     details: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, server_default=text("'{}'::jsonb"), nullable=False
+        JSONB, server_default=text("'{}'"), nullable=False
     )
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

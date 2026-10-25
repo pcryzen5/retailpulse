@@ -36,7 +36,12 @@ class DimStore(Base):
     __tablename__ = "dim_store"
     __table_args__ = ({"schema": "core"},)
 
-    store_id: Mapped[int] = mapped_column(SmallInteger, Identity(always=True), primary_key=True)
+    store_id: Mapped[int] = mapped_column(
+        SmallInteger().with_variant(Integer, "sqlite"),
+        Identity(always=True),
+        primary_key=True,
+        autoincrement=True,
+    )
     store_code: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     store_name: Mapped[str] = mapped_column(String, nullable=False)
     country: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -66,7 +71,12 @@ class DimProduct(Base):
         {"schema": "core"},
     )
 
-    product_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    product_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        Identity(always=True),
+        primary_key=True,
+        autoincrement=True,
+    )
     sku: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     category: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -93,7 +103,12 @@ class DimCustomer(Base):
     __tablename__ = "dim_customer"
     __table_args__ = ({"schema": "core"},)
 
-    customer_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        Identity(always=True),
+        primary_key=True,
+        autoincrement=True,
+    )
     customer_key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     country: Mapped[str | None] = mapped_column(String, nullable=True)
     first_order_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
@@ -157,7 +172,12 @@ class FactSalesLine(Base):
         {"schema": "core"},
     )
 
-    sales_line_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    sales_line_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        Identity(always=True),
+        primary_key=True,
+        autoincrement=True,
+    )
     batch_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("ops.ingestion_batch.batch_id"),
