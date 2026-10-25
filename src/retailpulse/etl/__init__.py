@@ -12,6 +12,14 @@ from retailpulse.etl.calendar import (
     mark_dim_date_completeness,
     project_closure_windows,
 )
+from retailpulse.etl.clean import (
+    CLEANED_COLUMNS,
+    UNIT_SEPARATOR,
+    CleanedDataset,
+    clean_sales_lines,
+    compute_source_row_hash,
+    compute_source_row_hashes,
+)
 from retailpulse.etl.quality import (
     MAX_REJECT_RATIO,
     OUTLIER_QTY,
@@ -39,9 +47,12 @@ from retailpulse.etl.quality import (
 )
 
 __all__ = [
+    "CLEANED_COLUMNS",
     "MAX_REJECT_RATIO",
     "OUTLIER_QTY",
+    "UNIT_SEPARATOR",
     "BatchGateResult",
+    "CleanedDataset",
     "QualityFinding",
     "build_calendar_records",
     "check_cross_sheet_overlap",
@@ -52,7 +63,10 @@ __all__ = [
     "check_non_product_skus",
     "check_type_coercion",
     "classify_returns",
+    "clean_sales_lines",
     "cleaned_sales_line_schema",
+    "compute_source_row_hash",
+    "compute_source_row_hashes",
     "days_to_christmas",
     "detect_closure_windows",
     "enforce_batch_gate",
