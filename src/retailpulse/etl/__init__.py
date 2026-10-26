@@ -1,5 +1,13 @@
 """ETL cleaning, transformation, and aggregation pipelines."""
 
+from retailpulse.etl.aggregate import (
+    AggregationResult,
+    aggregate_daily_sales,
+    classify_abc_xyz,
+    compute_customer_order_dates,
+    compute_product_first_last_dates,
+    run_aggregation_pipeline,
+)
 from retailpulse.etl.calendar import (
     build_calendar_records,
     days_to_christmas,
@@ -51,9 +59,11 @@ __all__ = [
     "MAX_REJECT_RATIO",
     "OUTLIER_QTY",
     "UNIT_SEPARATOR",
+    "AggregationResult",
     "BatchGateResult",
     "CleanedDataset",
     "QualityFinding",
+    "aggregate_daily_sales",
     "build_calendar_records",
     "check_cross_sheet_overlap",
     "check_customer_id_distribution",
@@ -62,9 +72,12 @@ __all__ = [
     "check_non_positive_price",
     "check_non_product_skus",
     "check_type_coercion",
+    "classify_abc_xyz",
     "classify_returns",
     "clean_sales_lines",
     "cleaned_sales_line_schema",
+    "compute_customer_order_dates",
+    "compute_product_first_last_dates",
     "compute_source_row_hash",
     "compute_source_row_hashes",
     "days_to_christmas",
@@ -83,6 +96,7 @@ __all__ = [
     "mark_dim_date_completeness",
     "project_closure_windows",
     "raw_sales_line_schema",
+    "run_aggregation_pipeline",
     "run_data_quality_checks",
     "validate_returns_and_cancellations",
     "validate_schema",
