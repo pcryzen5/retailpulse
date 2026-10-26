@@ -36,3 +36,11 @@ Format: Date, Decision, Context/Reason, Consequences.
 - **Decision:** Implemented Typer CLI application in `src/retailpulse/cli.py` with eager `--version` flag and explicit `version` command, registered via `[project.scripts]` in `pyproject.toml`.
 - **Context/Reason:** Fulfills task P0-04 and Appendix B CLI command specifications, providing a consistent operational interface for local development, CI/CD, and scheduled worker tasks.
 - **Consequences:** Future command groups (`db`, `users`, `etl`, `inventory`, `train`, `score`, `monitor`, `replay`) will register directly onto this Typer app.
+
+### 2026-10-26: DEC-006 - ETL CLI Command, Logging Stream Separation, and Parquet Caching
+- **Date:** 2026-10-26
+- **Decision:** Implemented `retailpulse etl run` supporting `online_retail_ii` and `generic_csv` adapters with chunked loader, post-load daily sales aggregation, ABC/XYZ categorization, and `--json` format output. Configured logging to default to `sys.stderr` so machine-readable `--json` streams cleanly over `sys.stdout` without log pollution. Added `scripts/convert_to_parquet.py` to convert UCI Excel sheets to Parquet for ~60x faster ETL reads.
+- **Context/Reason:** Fulfills task P1-10 and Appendix B CLI specifications; provides fast benchmarking (< 10 minutes) and clean stdout for pipeable CLI commands (e.g., `retailpulse etl run --json | jq .`).
+- **Consequences:** Pipeline operators can execute full ETL and verification flows with idempotency and clean machine-readable telemetry.
+
+

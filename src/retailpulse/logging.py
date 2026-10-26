@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextvars
 import logging
 import sys
-from typing import cast
+from typing import TextIO, cast
 
 import structlog
 from structlog.types import EventDict, WrappedLogger
@@ -58,17 +58,24 @@ def add_request_id(
     return event_dict
 
 
-def configure_logging(level: str = "INFO", *, json_format: bool = True) -> None:
+def configure_logging(
+    level: str = "INFO",
+    *,
+    json_format: bool = True,
+    stream: TextIO | None = None,
+) -> None:
     """Configure structlog and standard library logging.
 
     Args:
         level: Minimum log level string (e.g. 'DEBUG', 'INFO', 'WARNING').
         json_format: Whether to output JSON formatted lines (default: True).
+        stream: Output stream for logging (defaults to sys.stderr).
     """
+    target_stream = stream if stream is not None else sys.stderr
     numeric_level = getattr(logging, level.upper(), logging.INFO)
     logging.basicConfig(
         format="%(message)s",
-        stream=sys.stdout,
+        stream=target_stream,
         level=numeric_level,
         force=True,
     )

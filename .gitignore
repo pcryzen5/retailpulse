@@ -44,7 +44,8 @@ htmlcov/
 *.key
 
 # Data and MLflow artifacts
-data/
+data/*
+!data/README.md
 mlruns/
 mlartifacts/
 *.parquet

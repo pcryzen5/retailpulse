@@ -214,16 +214,46 @@ class OnlineRetailIIAdapter:
         return combined
 
     @classmethod
+    def read_parquet(
+        cls,
+        source: str | os.PathLike[str],
+        default_store_code: str = "ONLINE",
+    ) -> pd.DataFrame:
+        """Read a Parquet export of Online Retail II.
+
+        Returns the canonical sales line DataFrame.
+        """
+        logger.info("reading online retail ii parquet", source=str(source))
+        try:
+            df = pd.read_parquet(source)
+        except Exception as exc:
+            raise IngestionError(
+                f"Failed to read Online Retail II Parquet from {source}: {exc}",
+                details={"source": str(source), "error": str(exc)},
+            ) from exc
+
+        canonical_cols = {"invoice_no", "invoice_ts", "sku", "quantity", "unit_price"}
+        if canonical_cols.issubset(set(df.columns)):
+            return df
+
+        return _process_raw_frame(df, sheet_name="parquet", default_store_code=default_store_code)
+
+    @classmethod
     def read(
         cls,
         source: str | os.PathLike[str] | BinaryIO | TextIO,
         default_store_code: str = "ONLINE",
     ) -> pd.DataFrame:
-        """Auto-detect format (CSV or XLSX) and produce the canonical DataFrame."""
+        """Auto-detect format (CSV, XLSX, or Parquet) and produce the canonical DataFrame."""
         path_str = str(source).lower()
         if path_str.endswith(".xlsx") or path_str.endswith(".xls"):
             return cls.read_xlsx(
                 cast(str | os.PathLike[str] | BinaryIO, source),
+                default_store_code=default_store_code,
+            )
+        if path_str.endswith(".parquet") or path_str.endswith(".pq"):
+            return cls.read_parquet(
+                cast(str | os.PathLike[str], source),
                 default_store_code=default_store_code,
             )
         return cls.read_csv(source, default_store_code=default_store_code)
