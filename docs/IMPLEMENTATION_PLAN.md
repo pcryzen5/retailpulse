@@ -91,7 +91,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P1-10 ETL CLI and data guide.** `retailpulse etl run --source --path`; `data/README.md` (how to obtain the dataset from the UCI page named in TRD §4.1, license and citation, optional Parquet conversion). *Verify:* full-dataset load < 10 min; row counts in `reports/etl_benchmark.md` reconcile: 1,067,371 read → 1,044,848 after the cross-sheet overlap → 1,033,036 after exact duplicates.
 
 ### Phase 2 — Demand forecasting
-- [ ] **P2-01 Series builder.** `features/forecast_features.py`: top-N selection, eligibility, zero-filled trading-day series, leakage-safe lag/rolling/calendar features. *Verify:* leakage test (features at origin use no later data).
+- [x] **P2-01 Series builder.** `features/forecast_features.py`: top-N selection, eligibility, zero-filled trading-day series, leakage-safe lag/rolling/calendar features. *Verify:* leakage test (features at origin use no later data).
 - [ ] **P2-02 Metrics.** WAPE, MASE, RMSSE, bias, sMAPE, coverage, pinball with zero-scale handling. *Verify:* tests against hand-computed values.
 - [ ] **P2-03 Interface and baselines.** `Forecaster` protocol; naive, seasonal naive, moving average, Croston-SBA. *Verify:* unit tests on synthetic series with known answers.
 - [ ] **P2-04 Backtest harness.** Rolling-origin, model-agnostic, asserts training data < origin. *Verify:* test where seasonal naive is perfect on a weekly-periodic series.
