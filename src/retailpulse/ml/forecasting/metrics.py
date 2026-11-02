@@ -15,7 +15,7 @@ Implements P2-02, TRD §5.1, and DATABASE.md §7:
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
@@ -333,7 +333,7 @@ def _append_scope_records(
 def compute_forecast_metrics_by_scope(
     eval_df: pd.DataFrame,
     *,
-    in_sample_history: dict[Any, np.ndarray[Any, Any] | Sequence[float]] | None = None,
+    in_sample_history: Mapping[Any, np.ndarray[Any, Any] | Sequence[float]] | None = None,
 ) -> pd.DataFrame:
     """Compute aggregated metrics across scopes matching ml.forecast_metric schema.
 

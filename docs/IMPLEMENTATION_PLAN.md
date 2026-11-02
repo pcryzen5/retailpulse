@@ -94,7 +94,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P2-01 Series builder.** `features/forecast_features.py`: top-N selection, eligibility, zero-filled trading-day series, leakage-safe lag/rolling/calendar features. *Verify:* leakage test (features at origin use no later data).
 - [x] **P2-02 Metrics.** WAPE, MASE, RMSSE, bias, sMAPE, coverage, pinball with zero-scale handling. *Verify:* tests against hand-computed values.
 - [x] **P2-03 Interface and baselines.** `Forecaster` protocol; naive, seasonal naive, moving average, Croston-SBA. *Verify:* unit tests on synthetic series with known answers.
-- [ ] **P2-04 Backtest harness.** Rolling-origin, model-agnostic, asserts training data < origin. *Verify:* test where seasonal naive is perfect on a weekly-periodic series.
+- [x] **P2-04 Backtest harness.** Rolling-origin, model-agnostic, asserts training data < origin. *Verify:* test where seasonal naive is perfect on a weekly-periodic series.
 - [ ] **P2-05 Intervals.** Residual-quantile intervals per (model, ABC, horizon bucket). *Verify:* coverage within tolerance on synthetic noise.
 - [ ] **P2-06 LightGBM forecaster.** Direct strategy per TRD §5.1; compare `tweedie` vs `regression`; deterministic settings. *Verify:* beats naive on a synthetic trending-seasonal dataset; same seed gives same output.
 - [ ] **P2-07 Prophet forecaster.** Isolated in `prophet_model.py`; parallel fit; GB holidays; fallback to Croston-SBA for ineligible series. *Verify:* smoke test on 3 series (marked `slow`).

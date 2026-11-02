@@ -417,13 +417,12 @@ def clip_training_targets(
     - Evaluation always uses unclipped actuals.
     """
     out = df.copy()
+    if out.empty or group_col not in out.columns or target_col not in out.columns:
+        return out
 
-    def _clip_series(group: pd.DataFrame) -> pd.DataFrame:
-        cap = float(group[target_col].quantile(quantile))
-        group[target_col] = group[target_col].clip(upper=cap)
-        return group
-
-    return out.groupby(group_col, group_keys=False).apply(_clip_series)
+    caps = out.groupby(group_col)[target_col].transform(lambda s: s.quantile(quantile))
+    out[target_col] = out[target_col].clip(upper=caps)
+    return out
 
 
 def _compute_origin_series_stats(
