@@ -96,7 +96,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P2-03 Interface and baselines.** `Forecaster` protocol; naive, seasonal naive, moving average, Croston-SBA. *Verify:* unit tests on synthetic series with known answers.
 - [x] **P2-04 Backtest harness.** Rolling-origin, model-agnostic, asserts training data < origin. *Verify:* test where seasonal naive is perfect on a weekly-periodic series.
 - [x] **P2-05 Intervals.** Residual-quantile intervals per (model, ABC, horizon bucket). *Verify:* coverage within tolerance on synthetic noise.
-- [ ] **P2-06 LightGBM forecaster.** Direct strategy per TRD §5.1; compare `tweedie` vs `regression`; deterministic settings. *Verify:* beats naive on a synthetic trending-seasonal dataset; same seed gives same output.
+- [x] **P2-06 LightGBM forecaster.** Direct strategy per TRD §5.1; compare `tweedie` vs `regression`; deterministic settings. *Verify:* beats naive on a synthetic trending-seasonal dataset; same seed gives same output.
 - [ ] **P2-07 Prophet forecaster.** Isolated in `prophet_model.py`; parallel fit; GB holidays; fallback to Croston-SBA for ineligible series. *Verify:* smoke test on 3 series (marked `slow`).
 - [ ] **P2-08 LSTM forecaster.** PyTorch, windowing, scaling, early stopping, fixed seeds, CPU. *Verify:* tiny-data test (loss decreases; deterministic).
 - [ ] **P2-09 MLflow wrapper.** `ml/registry.py`, `ml/runs.py`: log params, metrics, artifacts and tags; register models; alias helpers; mirror to `ml.model_run` and `ml.forecast_metric`. *Verify:* integration test with a temp file-store MLflow.
