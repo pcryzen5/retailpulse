@@ -48,6 +48,8 @@ data/*
 !data/README.md
 mlruns/
 mlartifacts/
+mlflow.db
+*.db
 *.parquet
 online_retail_II.xlsx
 

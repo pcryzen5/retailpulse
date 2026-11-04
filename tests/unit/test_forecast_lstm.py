@@ -187,4 +187,3 @@ def test_lstm_error_handling_and_edge_cases() -> None:
     )
     with pytest.raises(ValueError, match="Insufficient history span"):
         unfitted.fit(short_df)
-
