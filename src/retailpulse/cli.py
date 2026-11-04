@@ -6,7 +6,7 @@ import datetime
 import json
 import sys
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -386,3 +386,186 @@ def etl_run(  # noqa: PLR0917
         path,
         json_output=json_output,
     )
+
+
+train_app = typer.Typer(
+    name="train",
+    help="Model training and champion selection workflows.",
+    no_args_is_help=True,
+)
+app.add_typer(train_app, name="train")
+
+
+def _emit_train_forecast_summary(result: Any, *, json_output: bool) -> None:
+    """Format and print training pipeline leaderboard and gate verdict."""
+    if json_output:
+        out = {
+            "status": "succeeded",
+            "data_as_of": str(result.data_as_of),
+            "n_series": result.total_series,
+            "n_folds": result.n_folds,
+            "horizon": result.horizon,
+            "champion_model": result.champion_model,
+            "champion_version": result.champion_version,
+            "gate": {
+                "passed": result.gate_result.passed_gate,
+                "candidate": result.gate_result.candidate_model,
+                "candidate_wape": result.gate_result.candidate_wape,
+                "baseline_wape": result.gate_result.baseline_wape,
+                "candidate_bias": result.gate_result.candidate_bias,
+                "alert": result.gate_result.alert,
+                "rejection_reasons": result.gate_result.rejection_reasons,
+            },
+            "models": {
+                name: {
+                    "global_wape": b.global_wape,
+                    "global_bias": b.global_bias,
+                    "global_smape": b.global_smape,
+                    "registered_version": result.registered_versions.get(name),
+                }
+                for name, b in result.backtest_results.items()
+            },
+        }
+        typer.echo(json.dumps(out, indent=2))
+        return
+
+    typer.secho(
+        "\n================ Forecasting Backtest Leaderboard ================",
+        fg=typer.colors.GREEN,
+    )
+    typer.echo(
+        f"Cutoff Date (as_of): {result.data_as_of} | "
+        f"Series: {result.total_series} | Folds: {result.n_folds} | "
+        f"Horizon: {result.horizon}d\n"
+    )
+    typer.echo(f"{'Model':<18} {'WAPE':<10} {'Bias':<10} {'sMAPE':<10} {'Registered Ver':<15}")
+    typer.echo("-" * 65)
+    for name, b in result.backtest_results.items():
+        ver = result.registered_versions.get(name, "-")
+        typer.echo(
+            f"{name:<18} {b.global_wape:<10.4f} {b.global_bias:<10.4f} "
+            f"{b.global_smape:<10.4f} {ver:<15}"
+        )
+
+    typer.secho("\n---------------- Champion Gate Verdict ----------------", fg=typer.colors.CYAN)
+    if result.gate_result.passed_gate:
+        typer.secho(
+            f"Gate: PASSED (Winner: {result.champion_model})",
+            fg=typer.colors.GREEN,
+            bold=True,
+        )
+        typer.echo(
+            f"Candidate WAPE: {result.gate_result.candidate_wape:.4f} < "
+            f"Baseline WAPE: {result.gate_result.baseline_wape:.4f}"
+        )
+    else:
+        typer.secho(
+            f"Gate: FAILED (Fallback to Baseline: {result.champion_model})",
+            fg=typer.colors.YELLOW,
+            bold=True,
+        )
+        for r in result.gate_result.rejection_reasons:
+            typer.echo(f"  - {r}")
+        if result.gate_result.alert:
+            typer.secho(f"Alert: {result.gate_result.alert}", fg=typer.colors.RED)
+
+    ver_label = result.champion_version or "unregistered"
+    typer.echo(f"Champion: {result.champion_model} (Version: {ver_label})\n")
+
+
+@train_app.command("forecast")
+def train_forecast_command(  # noqa: PLR0917
+    data_as_of: Annotated[
+        str | None,
+        typer.Option(
+            "--data-as-of",
+            help="Cutoff date in YYYY-MM-DD format (defaults to latest complete date).",
+        ),
+    ] = None,
+    n_folds: Annotated[
+        int | None,
+        typer.Option(
+            "--n-folds",
+            help="Number of backtest folds (defaults to config: 5).",
+        ),
+    ] = None,
+    horizon: Annotated[
+        int | None,
+        typer.Option(
+            "--horizon",
+            help="Forecast horizon in days (defaults to config: 28).",
+        ),
+    ] = None,
+    top_n: Annotated[
+        int | None,
+        typer.Option(
+            "--top-n",
+            help="Number of top SKUs to forecast (defaults to config: 300).",
+        ),
+    ] = None,
+    models: Annotated[
+        str,
+        typer.Option(
+            "--models",
+            help="Comma-separated model names to evaluate (e.g. 'seasonal_naive,naive,lightgbm').",
+        ),
+    ] = "seasonal_naive,naive,lightgbm",
+    auto_promote: Annotated[
+        bool | None,
+        typer.Option(
+            "--auto-promote/--no-auto-promote",
+            help="Automatically promote winning candidate to champion alias.",
+        ),
+    ] = None,
+    seed: Annotated[
+        int,
+        typer.Option(
+            "--seed",
+            help="Random seed for deterministic execution.",
+        ),
+    ] = 42,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output execution summary in JSON format.",
+        ),
+    ] = False,
+) -> None:
+    """Execute demand forecasting training pipeline, backtesting, and champion gate."""
+    from retailpulse.ml.forecasting.train import train_forecast_pipeline  # noqa: PLC0415
+
+    parsed_as_of: datetime.date | None = None
+    if data_as_of:
+        try:
+            parsed_as_of = datetime.date.fromisoformat(data_as_of)
+        except ValueError as exc:
+            msg = f"Invalid date format '{data_as_of}': must be YYYY-MM-DD"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    models_list = [m.strip().lower() for m in models.split(",") if m.strip()]
+
+    if not json_output:
+        typer.secho("Starting demand forecasting training pipeline...", fg=typer.colors.CYAN)
+
+    try:
+        with session_scope() as session:
+            result = train_forecast_pipeline(
+                data_as_of=parsed_as_of,
+                session=session,
+                models_to_run=models_list,
+                n_folds=n_folds,
+                horizon=horizon,
+                top_n=top_n,
+                auto_promote=auto_promote,
+                seed=seed,
+            )
+    except Exception as exc:
+        if json_output:
+            typer.echo(json.dumps({"status": "failed", "error": str(exc)}))
+        else:
+            typer.secho(f"Training pipeline failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    _emit_train_forecast_summary(result, json_output=json_output)
