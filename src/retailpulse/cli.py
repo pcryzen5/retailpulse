@@ -569,3 +569,122 @@ def train_forecast_command(  # noqa: PLR0917
         raise typer.Exit(code=1) from exc
 
     _emit_train_forecast_summary(result, json_output=json_output)
+
+
+score_app = typer.Typer(
+    name="score",
+    help="Batch scoring and active output generation commands.",
+    no_args_is_help=True,
+)
+app.add_typer(score_app, name="score")
+
+
+@score_app.command("forecast")
+def score_forecast_command(  # noqa: PLR0917
+    data_as_of: Annotated[
+        str | None,
+        typer.Option(
+            "--data-as-of",
+            help="Origin cutoff date in YYYY-MM-DD format (defaults to latest complete date).",
+        ),
+    ] = None,
+    horizon: Annotated[
+        int | None,
+        typer.Option(
+            "--horizon",
+            help="Forecast horizon in trading days (defaults to config: 28).",
+        ),
+    ] = None,
+    top_n: Annotated[
+        int | None,
+        typer.Option(
+            "--top-n",
+            help="Number of top SKUs to forecast (defaults to config: 300).",
+        ),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            help="Model algorithm to use (defaults to active champion or best baseline).",
+        ),
+    ] = None,
+    interval_level: Annotated[
+        float | None,
+        typer.Option(
+            "--interval-level",
+            help="Nominal prediction interval coverage (defaults to 0.80).",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output execution summary in JSON format.",
+        ),
+    ] = False,
+) -> None:
+    """Execute batch forecasting, generate intervals, and update ml.active_output."""
+    from retailpulse.ml.forecasting.predict import predict_batch_forecast  # noqa: PLC0415
+
+    parsed_as_of: datetime.date | None = None
+    if data_as_of:
+        try:
+            parsed_as_of = datetime.date.fromisoformat(data_as_of)
+        except ValueError as exc:
+            msg = f"Invalid date format '{data_as_of}': must be YYYY-MM-DD"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    if not json_output:
+        typer.secho("Executing batch forecasting...", fg=typer.colors.CYAN)
+
+    try:
+        with session_scope() as session:
+            result = predict_batch_forecast(
+                session=session,
+                data_as_of=parsed_as_of,
+                model_name=model,
+                horizon=horizon,
+                top_n=top_n,
+                interval_level=interval_level,
+            )
+    except Exception as exc:
+        if json_output:
+            typer.echo(json.dumps({"status": "failed", "error": str(exc)}))
+        else:
+            typer.secho(f"Batch forecasting failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    if json_output:
+        out = {
+            "status": "succeeded",
+            "model_name": result.model_name,
+            "model_run_id": str(result.model_run_id),
+            "origin_date": str(result.origin_date),
+            "horizon": result.horizon,
+            "n_series": result.n_series,
+            "n_forecast_rows": result.n_forecast_rows,
+            "interval_level": result.interval_level,
+            "active_output_updated": result.active_output_updated,
+        }
+        typer.echo(json.dumps(out, indent=2))
+    else:
+        typer.secho(
+            "\n================ Batch Forecast Completed ================",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo(f"Model: {result.model_name} (Run ID: {result.model_run_id})")
+        typer.echo(
+            f"Origin Date: {result.origin_date} | Horizon: {result.horizon}d | "
+            f"Interval Level: {result.interval_level:.0%}"
+        )
+        typer.echo(
+            f"Series Forecasted: {result.n_series:,} | "
+            f"Forecast Rows Written: {result.n_forecast_rows:,}"
+        )
+        typer.secho(
+            "Active Output Pointer: UPDATED (ml.active_output)\n",
+            fg=typer.colors.GREEN,
+            bold=True,
+        )

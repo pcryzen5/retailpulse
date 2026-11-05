@@ -101,7 +101,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P2-08 LSTM forecaster.** PyTorch, windowing, scaling, early stopping, fixed seeds, CPU. *Verify:* tiny-data test (loss decreases; deterministic).
 - [x] **P2-09 MLflow wrapper.** `ml/registry.py`, `ml/runs.py`: log params, metrics, artifacts and tags; register models; alias helpers; mirror to `ml.model_run` and `ml.forecast_metric`. *Verify:* integration test with a temp file-store MLflow.
 - [x] **P2-10 Training pipeline.** `forecasting/train.py`: run all models, aggregate metrics, apply the champion gate; CLI `retailpulse train forecast`. *Verify:* run on the fixture; a deliberately bad model is rejected by the gate (test).
-- [ ] **P2-11 Batch forecasting.** `forecasting/predict.py`: champion (or best baseline), intervals, write `ml.forecast` and move `ml.active_output` in one transaction; CLI `retailpulse score forecast`. *Verify:* integration test; failed run leaves the pointer unchanged.
+- [x] **P2-11 Batch forecasting.** `forecasting/predict.py`: champion (or best baseline), intervals, write `ml.forecast` and move `ml.active_output` in one transaction; CLI `retailpulse score forecast`. *Verify:* integration test; failed run leaves the pointer unchanged.
 - [ ] **P2-12 Backtest report.** `scripts/report_forecast.py` writes `reports/forecast_backtest.md` with tables and plots and an honest discussion. *Verify:* file generated from a real run.
 
 ### Phase 3 — Customer analytics

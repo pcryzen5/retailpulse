@@ -100,7 +100,7 @@ class TrainingPipelineResult:
     horizon: int
 
 
-def _instantiate_model(model_name: str, *, seed: int = 42, horizon: int = 28) -> Forecaster:
+def instantiate_model(model_name: str, *, seed: int = 42, horizon: int = 28) -> Forecaster:
     """Instantiate a forecasting model by name with standard defaults."""
     clean_name = model_name.lower().strip()
     factories: dict[str, Callable[[], Forecaster]] = {
@@ -124,6 +124,9 @@ def _instantiate_model(model_name: str, *, seed: int = 42, horizon: int = 28) ->
 
     supported = (*STANDARD_BASELINES, "lightgbm", "prophet", "lstm")
     raise ValueError(f"Unsupported model name '{model_name}'. Supported models: {supported}")
+
+
+_instantiate_model = instantiate_model
 
 
 def _check_candidate_gate(
