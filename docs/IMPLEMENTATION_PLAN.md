@@ -105,7 +105,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P2-12 Backtest report.** `scripts/report_forecast.py` writes `reports/forecast_backtest.md` with tables and plots and an honest discussion. *Verify:* file generated from a real run.
 
 ### Phase 3 — Customer analytics
-- [ ] **P3-01 RFM.** `features/rfm.py` with `as_of`. *Verify:* hand-checked tiny dataset.
+- [x] **P3-01 RFM.** `features/rfm.py` with `as_of`. *Verify:* hand-checked tiny dataset.
 - [ ] **P3-02 Segmentation.** Training, k selection, deterministic label mapping, profiles, stability (ARI); MLflow; CLI `train segmentation` and `score segmentation`. *Verify:* profiles cover 100% of customers; labels deterministic across runs.
 - [ ] **P3-03 Churn data.** Cutoffs, labels, features (`features/churn_features.py`, `ml/churn/labels.py`) and the purged split. *Verify:* leakage tests (features ≤ T; label window (T, T+90]; no overlap across split boundary).
 - [ ] **P3-04 Churn models.** Logistic baseline, LightGBM, calibration, metrics, gate (must beat baseline PR-AUC on the test cutoff); CLI `train churn`. *Verify:* metrics logged; calibration artifact saved.
