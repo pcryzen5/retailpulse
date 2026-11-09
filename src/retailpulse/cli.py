@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 import sys
+import uuid
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -571,6 +572,126 @@ def train_forecast_command(  # noqa: PLR0917
     _emit_train_forecast_summary(result, json_output=json_output)
 
 
+@train_app.command("segmentation")
+def train_segmentation_command(  # noqa: PLR0917
+    data_as_of: Annotated[
+        str | None,
+        typer.Option(
+            "--data-as-of",
+            help="Cutoff date in YYYY-MM-DD format (defaults to latest complete date).",
+        ),
+    ] = None,
+    k: Annotated[
+        int | None,
+        typer.Option(
+            "--k",
+            help="Explicit number of clusters (defaults to optimal search in 3..8).",
+        ),
+    ] = None,
+    auto_promote: Annotated[
+        bool,
+        typer.Option(
+            "--auto-promote",
+            help="Promote newly trained model to active champion.",
+        ),
+    ] = False,
+    seed: Annotated[
+        int | None,
+        typer.Option(
+            "--seed",
+            help="Random seed for clustering initialization (defaults to config: 42).",
+        ),
+    ] = None,
+    rfm_window_days: Annotated[
+        int | None,
+        typer.Option(
+            "--rfm-window-days",
+            help="Lookback window for RFM features in days (defaults to config: 730).",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output execution summary in JSON format.",
+        ),
+    ] = False,
+) -> None:
+    """Execute customer segmentation training, k selection, and profile generation."""
+    from retailpulse.ml.segmentation.train import train_segmentation_pipeline  # noqa: PLC0415
+
+    parsed_as_of: datetime.date | None = None
+    if data_as_of:
+        try:
+            parsed_as_of = datetime.date.fromisoformat(data_as_of)
+        except ValueError as exc:
+            msg = f"Invalid date format '{data_as_of}': must be YYYY-MM-DD"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    if not json_output:
+        typer.secho("Starting customer segmentation training pipeline...", fg=typer.colors.CYAN)
+
+    try:
+        with session_scope() as session:
+            result = train_segmentation_pipeline(
+                session=session,
+                data_as_of=parsed_as_of,
+                k=k,
+                auto_promote=auto_promote,
+                seed=seed,
+                rfm_window_days=rfm_window_days,
+            )
+    except Exception as exc:
+        if json_output:
+            typer.echo(json.dumps({"status": "failed", "error": str(exc)}))
+        else:
+            typer.secho(f"Segmentation training failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    if json_output:
+        out = {
+            "status": "succeeded",
+            "model_run_id": str(result.model_run_id),
+            "data_as_of": str(result.data_as_of),
+            "chosen_k": result.chosen_k,
+            "silhouette": result.silhouette,
+            "davies_bouldin": result.davies_bouldin,
+            "mean_ari_stability": result.mean_ari_stability,
+            "n_customers": result.n_customers,
+            "is_champion": result.is_champion,
+            "version": result.version,
+            "profiles": result.profiles_df.to_dict(orient="records"),
+        }
+        typer.echo(json.dumps(out, indent=2))
+    else:
+        typer.secho(
+            "\n================ Customer Segmentation Training Completed ================",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo(f"Model Run ID: {result.model_run_id}")
+        typer.echo(
+            f"Chosen k: {result.chosen_k} | Silhouette: {result.silhouette:.4f} | "
+            f"DB: {result.davies_bouldin:.4f} | ARI Stability: {result.mean_ari_stability:.4f}"
+        )
+        typer.echo(
+            f"Customers Clustered: {result.n_customers:,} | "
+            f"Champion Promoted: {result.is_champion} (Version: {result.version or 'N/A'})\n"
+        )
+        typer.secho("Segment Profiles (100% customer coverage):", bold=True)
+        for _, row in result.profiles_df.iterrows():
+            pct = row["n_customers"] / result.n_customers
+            typer.echo(
+                f"  [{row['segment_id']}] {row['segment_label']:<16} | "
+                f"Count: {int(row['n_customers']):>5} ({pct:>5.1%}) | "
+                f"Rev: {float(row['revenue_share']):>5.1%} | "
+                f"R: {row['avg_recency_days']:>5.1f}d | "
+                f"F: {row['avg_frequency']:>4.1f} | "
+                f"M: ${row['avg_monetary']:>9.2f}"
+            )
+        typer.echo()
+
+
 score_app = typer.Typer(
     name="score",
     help="Batch scoring and active output generation commands.",
@@ -688,3 +809,109 @@ def score_forecast_command(  # noqa: PLR0917
             fg=typer.colors.GREEN,
             bold=True,
         )
+
+
+@score_app.command("segmentation")
+def score_segmentation_command(
+    data_as_of: Annotated[
+        str | None,
+        typer.Option(
+            "--data-as-of",
+            help="Cutoff date in YYYY-MM-DD format (defaults to latest complete date).",
+        ),
+    ] = None,
+    model_run_id: Annotated[
+        str | None,
+        typer.Option(
+            "--model-run-id",
+            help="Explicit ModelRun UUID to score with (defaults to active champion).",
+        ),
+    ] = None,
+    rfm_window_days: Annotated[
+        int | None,
+        typer.Option(
+            "--rfm-window-days",
+            help="Lookback window for RFM features in days (defaults to config: 730).",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output execution summary in JSON format.",
+        ),
+    ] = False,
+) -> None:
+    """Score customers into segments and atomically update ml.active_output."""
+    from retailpulse.ml.segmentation.score import score_segmentation_pipeline  # noqa: PLC0415
+
+    parsed_as_of: datetime.date | None = None
+    if data_as_of:
+        try:
+            parsed_as_of = datetime.date.fromisoformat(data_as_of)
+        except ValueError as exc:
+            msg = f"Invalid date format '{data_as_of}': must be YYYY-MM-DD"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    parsed_run_id: uuid.UUID | None = None
+    if model_run_id:
+        try:
+            parsed_run_id = uuid.UUID(model_run_id)
+        except ValueError as exc:
+            msg = f"Invalid UUID format '{model_run_id}'"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    if not json_output:
+        typer.secho("Executing customer segmentation scoring...", fg=typer.colors.CYAN)
+
+    try:
+        with session_scope() as session:
+            result = score_segmentation_pipeline(
+                session=session,
+                data_as_of=parsed_as_of,
+                model_run_id=parsed_run_id,
+                rfm_window_days=rfm_window_days,
+            )
+    except Exception as exc:
+        if json_output:
+            typer.echo(json.dumps({"status": "failed", "error": str(exc)}))
+        else:
+            typer.secho(f"Segmentation scoring failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    if json_output:
+        out = {
+            "status": "succeeded",
+            "model_run_id": str(result.model_run_id),
+            "data_as_of": str(result.data_as_of),
+            "n_customers": result.n_customers,
+            "active_output_updated": result.active_output_updated,
+            "profiles": result.profiles_df.to_dict(orient="records"),
+        }
+        typer.echo(json.dumps(out, indent=2))
+    else:
+        typer.secho(
+            "\n================ Customer Segmentation Scoring Completed ================",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo(f"Model Run ID: {result.model_run_id}")
+        typer.echo(f"Data As Of: {result.data_as_of} | Customers Scored: {result.n_customers:,}")
+        typer.secho(
+            "Active Output Pointer: UPDATED (ml.active_output)\n",
+            fg=typer.colors.GREEN,
+            bold=True,
+        )
+        typer.secho("Segment Profiles (100% customer coverage):", bold=True)
+        for _, row in result.profiles_df.iterrows():
+            pct = row["n_customers"] / result.n_customers
+            typer.echo(
+                f"  [{row['segment_id']}] {row['segment_label']:<16} | "
+                f"Count: {int(row['n_customers']):>5} ({pct:>5.1%}) | "
+                f"Rev: {float(row['revenue_share']):>5.1%} | "
+                f"R: {row['avg_recency_days']:>5.1f}d | "
+                f"F: {row['avg_frequency']:>4.1f} | "
+                f"M: ${row['avg_monetary']:>9.2f}"
+            )
+        typer.echo()
