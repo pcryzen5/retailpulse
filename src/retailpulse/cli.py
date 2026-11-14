@@ -692,6 +692,123 @@ def train_segmentation_command(  # noqa: PLR0917
         typer.echo()
 
 
+@train_app.command("churn")
+def train_churn_command(
+    data_as_of: Annotated[
+        str | None,
+        typer.Option(
+            "--data-as-of",
+            help="Cutoff date in YYYY-MM-DD format (defaults to latest complete date).",
+        ),
+    ] = None,
+    churn_window_days: Annotated[
+        int | None,
+        typer.Option(
+            "--churn-window-days",
+            help="Outcome observation window in days (defaults to config: 90).",
+        ),
+    ] = None,
+    auto_promote: Annotated[
+        bool,
+        typer.Option(
+            "--auto-promote",
+            help="Promote newly trained model to active champion if gate passes.",
+        ),
+    ] = False,
+    seed: Annotated[
+        int | None,
+        typer.Option(
+            "--seed",
+            help="Random seed for model training (defaults to config: 42).",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output execution summary in JSON format.",
+        ),
+    ] = False,
+) -> None:
+    """Execute customer churn model training, calibration, and champion gating."""
+    from retailpulse.ml.churn.train import train_churn_pipeline  # noqa: PLC0415
+
+    parsed_as_of: datetime.date | None = None
+    if data_as_of:
+        try:
+            parsed_as_of = datetime.date.fromisoformat(data_as_of)
+        except ValueError as exc:
+            msg = f"Invalid date format '{data_as_of}': must be YYYY-MM-DD"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    if not json_output:
+        typer.secho("Starting customer churn training pipeline...", fg=typer.colors.CYAN)
+
+    try:
+        with session_scope() as session:
+            result = train_churn_pipeline(
+                session=session,
+                data_as_of=parsed_as_of,
+                churn_window_days=churn_window_days,
+                auto_promote=auto_promote,
+                seed=seed,
+            )
+    except Exception as exc:
+        if json_output:
+            typer.echo(json.dumps({"status": "failed", "error": str(exc)}))
+        else:
+            typer.secho(f"Churn training failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    if json_output:
+        out = {
+            "status": "succeeded",
+            "model_run_id": str(result.model_run_id),
+            "data_as_of": str(result.data_as_of),
+            "selected_algorithm": result.selected_algorithm,
+            "calibration_method": result.calibration_method,
+            "passed_gate": result.passed_gate,
+            "candidate_pr_auc": result.candidate_pr_auc,
+            "baseline_pr_auc": result.baseline_pr_auc,
+            "candidate_metrics": result.candidate_metrics,
+            "baseline_metrics": result.baseline_metrics,
+            "is_champion": result.is_champion,
+            "version": result.version,
+            "train_cutoffs": [str(c) for c in result.train_cutoffs],
+            "val_cutoffs": [str(c) for c in result.val_cutoffs],
+            "test_cutoffs": [str(c) for c in result.test_cutoffs],
+        }
+        typer.echo(json.dumps(out, indent=2))
+    else:
+        status_color = typer.colors.GREEN if result.passed_gate else typer.colors.YELLOW
+        typer.secho(
+            "\n================ Customer Churn Training Completed ================",
+            fg=status_color,
+        )
+        typer.echo(f"Model Run ID: {result.model_run_id}")
+        typer.echo(
+            f"Selected Algorithm: {result.selected_algorithm} | "
+            f"Calibration: {result.calibration_method or 'None'} | "
+            f"Champion Gate Passed: {result.passed_gate}"
+        )
+        typer.echo(
+            f"Candidate PR-AUC: {result.candidate_pr_auc:.4f} | "
+            f"Baseline PR-AUC: {result.baseline_pr_auc:.4f} | "
+            f"ROC-AUC: {result.candidate_metrics['roc_auc']:.4f}"
+        )
+        typer.echo(
+            f"Brier Score: {result.candidate_metrics['brier_score']:.4f} "
+            f"(Base Rate: {result.candidate_metrics['brier_score_base_rate']:.4f}) | "
+            f"Prec@10%: {result.candidate_metrics['precision_top_10']:.4f} | "
+            f"Lift@10%: {result.candidate_metrics['lift_top_10']:.2f}x"
+        )
+        typer.echo(
+            f"Champion Promoted: {result.is_champion} (Version: {result.version or 'N/A'})\n"
+        )
+        typer.echo()
+
+
 score_app = typer.Typer(
     name="score",
     help="Batch scoring and active output generation commands.",
