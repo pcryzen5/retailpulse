@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from retailpulse.ml.churn.explain import (
+    ChurnDriverReason,
+    compute_global_feature_importance,
+    explain_churn_predictions,
+    plot_global_feature_importance,
+)
 from retailpulse.ml.churn.labels import (
     build_churn_dataset,
     compute_churn_labels,
@@ -42,6 +48,7 @@ __all__ = [
     "RISK_BAND_MEDIUM",
     "TASK_CHURN",
     "CalibratedChurnModel",
+    "ChurnDriverReason",
     "ChurnTrainResult",
     "assign_risk_band",
     "assign_risk_bands",
@@ -50,10 +57,13 @@ __all__ = [
     "compute_churn_labels",
     "compute_churn_labels_from_db",
     "compute_churn_metrics",
+    "compute_global_feature_importance",
     "create_logistic_baseline_pipeline",
     "create_purged_temporal_split",
+    "explain_churn_predictions",
     "fit_lightgbm_with_early_stopping",
     "generate_monthly_cutoffs",
     "plot_calibration_curve",
+    "plot_global_feature_importance",
     "train_churn_pipeline",
 ]

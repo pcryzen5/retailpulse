@@ -109,7 +109,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P3-02 Segmentation.** Training, k selection, deterministic label mapping, profiles, stability (ARI); MLflow; CLI `train segmentation` and `score segmentation`. *Verify:* profiles cover 100% of customers; labels deterministic across runs.
 - [x] **P3-03 Churn data.** Cutoffs, labels, features (`features/churn_features.py`, `ml/churn/labels.py`) and the purged split. *Verify:* leakage tests (features ≤ T; label window (T, T+90]; no overlap across split boundary).
 - [x] **P3-04 Churn models.** Logistic baseline, LightGBM, calibration, metrics, gate (must beat baseline PR-AUC on the test cutoff); CLI `train churn`. *Verify:* metrics logged; calibration artifact saved.
-- [ ] **P3-05 Explanations.** `ml/churn/explain.py` top-3 reasons; global importance artifact. *Verify:* every scored row has three reasons with stable feature keys.
+- [x] **P3-05 Explanations.** `ml/churn/explain.py` top-3 reasons; global importance artifact. *Verify:* every scored row has three reasons with stable feature keys.
 - [ ] **P3-06 Churn scoring.** `ml.churn_score`, bands, active pointer; CLI `score churn`. *Verify:* integration test; bands follow thresholds.
 - [ ] **P3-07 Revenue at risk and report.** Formula from TRD §5.3; `reports/churn_and_segments.md`. *Verify:* unit test on known inputs.
 

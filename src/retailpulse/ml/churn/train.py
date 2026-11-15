@@ -27,6 +27,10 @@ from sqlalchemy.orm import Session
 from retailpulse.config import get_settings
 from retailpulse.db.models.core import FactSalesLine
 from retailpulse.logging import get_logger
+from retailpulse.ml.churn.explain import (
+    compute_global_feature_importance,
+    plot_global_feature_importance,
+)
 from retailpulse.ml.churn.labels import (
     build_churn_dataset,
     create_purged_temporal_split,
@@ -335,6 +339,18 @@ def train_churn_pipeline(  # noqa: PLR0915
         with metrics_json_path.open("w", encoding="utf-8") as f:
             json.dump(metrics_summary, f, indent=2)
 
+        # Artifact 4: Global feature importance plot and JSON
+        importance_df = compute_global_feature_importance(selected_model, test_df)
+        feat_imp_plot_path = temp_path / "feature_importance.png"
+        plot_global_feature_importance(
+            importance_df,
+            feat_imp_plot_path,
+            title=f"Global Feature Importance on Test Cutoff ({test_cutoffs[0]})",
+        )
+        feat_imp_json_path = temp_path / "feature_importance.json"
+        with feat_imp_json_path.open("w", encoding="utf-8") as f:
+            json.dump(importance_df.to_dict(orient="records"), f, indent=2)
+
         # Parameters to log
         run_params = {
             "task": TASK_CHURN,
@@ -385,6 +401,8 @@ def train_churn_pipeline(  # noqa: PLR0915
             tracker.log_artifact(str(model_artifact_path), artifact_path="model")
             tracker.log_artifact(str(curve_path), artifact_path="artifacts")
             tracker.log_artifact(str(metrics_json_path), artifact_path="artifacts")
+            tracker.log_artifact(str(feat_imp_plot_path), artifact_path="artifacts")
+            tracker.log_artifact(str(feat_imp_json_path), artifact_path="artifacts")
 
             model_run_uuid = tracker.run_id
             mlflow_run_id = tracker.mlflow_run_id
