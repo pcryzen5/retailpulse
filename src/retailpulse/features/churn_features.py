@@ -22,7 +22,7 @@ import pandas as pd
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from retailpulse.db.models.core import FactSalesLine
+from retailpulse.db.models.core import DimCustomer, FactSalesLine
 from retailpulse.logging import get_logger
 
 logger = get_logger(__name__)
@@ -250,16 +250,21 @@ def build_churn_features_from_db(
     Returns:
         DataFrame with churn features for active customers as of cutoff T.
     """
-    stmt = sa.select(
-        FactSalesLine.customer_id,
-        FactSalesLine.date_key,
-        FactSalesLine.quantity,
-        FactSalesLine.unit_price,
-        FactSalesLine.invoice_no,
-        FactSalesLine.product_id,
-    ).where(
-        FactSalesLine.date_key <= cutoff,
-        FactSalesLine.customer_id.isnot(None),
+    stmt = (
+        sa.select(
+            FactSalesLine.customer_id,
+            FactSalesLine.date_key,
+            FactSalesLine.quantity,
+            FactSalesLine.unit_price,
+            FactSalesLine.invoice_no,
+            FactSalesLine.product_id,
+            DimCustomer.country,
+        )
+        .outerjoin(DimCustomer, FactSalesLine.customer_id == DimCustomer.customer_id)
+        .where(
+            FactSalesLine.date_key <= cutoff,
+            FactSalesLine.customer_id.isnot(None),
+        )
     )
 
     rows = session.execute(stmt).all()
@@ -268,6 +273,14 @@ def build_churn_features_from_db(
 
     df = pd.DataFrame(
         rows,
-        columns=["customer_id", "date_key", "quantity", "unit_price", "invoice_no", "product_id"],
+        columns=[
+            "customer_id",
+            "date_key",
+            "quantity",
+            "unit_price",
+            "invoice_no",
+            "product_id",
+            "country",
+        ],
     )
     return build_churn_features(df, cutoff, lookback_days=lookback_days)

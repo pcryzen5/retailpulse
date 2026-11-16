@@ -208,4 +208,3 @@ def test_global_feature_importance_and_plot(
     plot_global_feature_importance(importance_df, out_plot, top_n=10)
     assert out_plot.is_file()
     assert out_plot.stat().st_size > 0
-

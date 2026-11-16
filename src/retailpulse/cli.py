@@ -1032,3 +1032,117 @@ def score_segmentation_command(
                 f"M: ${row['avg_monetary']:>9.2f}"
             )
         typer.echo()
+
+
+@score_app.command("churn")
+def score_churn_command(
+    data_as_of: Annotated[
+        str | None,
+        typer.Option(
+            "--data-as-of",
+            help="Cutoff date in YYYY-MM-DD format (defaults to latest complete date).",
+        ),
+    ] = None,
+    model_run_id: Annotated[
+        str | None,
+        typer.Option(
+            "--model-run-id",
+            help="Explicit ModelRun UUID to score with (defaults to active champion).",
+        ),
+    ] = None,
+    lookback_days: Annotated[
+        int,
+        typer.Option(
+            "--lookback-days",
+            help="Trailing window for active customers in days (default: 365).",
+        ),
+    ] = 365,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output execution summary in JSON format.",
+        ),
+    ] = False,
+) -> None:
+    """Score active customers for churn risk and atomically update ml.active_output."""
+    from retailpulse.ml.churn.predict import score_churn_pipeline  # noqa: PLC0415
+
+    parsed_as_of: datetime.date | None = None
+    if data_as_of:
+        try:
+            parsed_as_of = datetime.date.fromisoformat(data_as_of)
+        except ValueError as exc:
+            msg = f"Invalid date format '{data_as_of}': must be YYYY-MM-DD"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    parsed_run_id: uuid.UUID | None = None
+    if model_run_id:
+        try:
+            parsed_run_id = uuid.UUID(model_run_id)
+        except ValueError as exc:
+            msg = f"Invalid UUID format '{model_run_id}'"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    if not json_output:
+        typer.secho("Executing customer churn batch scoring...", fg=typer.colors.CYAN)
+
+    try:
+        with session_scope() as session:
+            result = score_churn_pipeline(
+                session=session,
+                data_as_of=parsed_as_of,
+                model_run_id=parsed_run_id,
+                lookback_days=lookback_days,
+            )
+    except Exception as exc:
+        if json_output:
+            typer.echo(json.dumps({"status": "failed", "error": str(exc)}))
+        else:
+            typer.secho(f"Churn scoring failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    if json_output:
+        out = {
+            "status": "succeeded",
+            "model_run_id": str(result.model_run_id),
+            "algorithm": result.algorithm,
+            "data_as_of": str(result.data_as_of),
+            "n_customers": result.n_customers,
+            "active_output_updated": result.active_output_updated,
+            "band_counts": result.band_counts,
+            "mean_churn_probability": round(result.mean_churn_probability, 4),
+        }
+        typer.echo(json.dumps(out, indent=2))
+    else:
+        typer.secho(
+            "\n================ Customer Churn Scoring Completed ================",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo(f"Model Run ID: {result.model_run_id} ({result.algorithm})")
+        typer.echo(
+            f"Data As Of: {result.data_as_of} | Customers Scored: {result.n_customers:,} | "
+            f"Mean Churn Prob: {result.mean_churn_probability:.2%}"
+        )
+        typer.secho(
+            "Active Output Pointer: UPDATED (ml.active_output)\n",
+            fg=typer.colors.GREEN,
+            bold=True,
+        )
+        typer.secho("Risk Band Distribution:", bold=True)
+        total = max(1, result.n_customers)
+        for band in ["high", "medium", "low"]:
+            count = result.band_counts.get(band, 0)
+            pct = count / total
+            color = (
+                typer.colors.RED
+                if band == "high"
+                else (typer.colors.YELLOW if band == "medium" else typer.colors.GREEN)
+            )
+            typer.secho(
+                f"  {band.upper():<8} | Count: {count:>5} ({pct:>5.1%})",
+                fg=color,
+            )
+        typer.echo()

@@ -33,6 +33,10 @@ from retailpulse.ml.churn.models import (
     create_logistic_baseline_pipeline,
     fit_lightgbm_with_early_stopping,
 )
+from retailpulse.ml.churn.predict import (
+    ChurnScoreResult,
+    score_churn_pipeline,
+)
 from retailpulse.ml.churn.train import (
     TASK_CHURN,
     ChurnTrainResult,
@@ -49,6 +53,7 @@ __all__ = [
     "TASK_CHURN",
     "CalibratedChurnModel",
     "ChurnDriverReason",
+    "ChurnScoreResult",
     "ChurnTrainResult",
     "assign_risk_band",
     "assign_risk_bands",
@@ -65,5 +70,6 @@ __all__ = [
     "generate_monthly_cutoffs",
     "plot_calibration_curve",
     "plot_global_feature_importance",
+    "score_churn_pipeline",
     "train_churn_pipeline",
 ]
