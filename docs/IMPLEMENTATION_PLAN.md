@@ -111,7 +111,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P3-04 Churn models.** Logistic baseline, LightGBM, calibration, metrics, gate (must beat baseline PR-AUC on the test cutoff); CLI `train churn`. *Verify:* metrics logged; calibration artifact saved.
 - [x] **P3-05 Explanations.** `ml/churn/explain.py` top-3 reasons; global importance artifact. *Verify:* every scored row has three reasons with stable feature keys.
 - [x] **P3-06 Churn scoring.** `ml.churn_score`, bands, active pointer; CLI `score churn`. *Verify:* integration test; bands follow thresholds.
-- [ ] **P3-07 Revenue at risk and report.** Formula from TRD §5.3; `reports/churn_and_segments.md`. *Verify:* unit test on known inputs.
+- [x] **P3-07 Revenue at risk and report.** Formula from TRD §5.3; `reports/churn_and_segments.md`. *Verify:* unit test on known inputs.
 
 ### Phase 4 — Inventory optimization
 - [ ] **P4-01 Synthetic parameters.** `ml/inventory/params.py` and `retailpulse inventory seed-params` (deterministic; `source='synthetic'`), plus snapshots. *Verify:* same seed gives identical rows.

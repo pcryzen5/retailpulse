@@ -37,6 +37,11 @@ from retailpulse.ml.churn.predict import (
     ChurnScoreResult,
     score_churn_pipeline,
 )
+from retailpulse.ml.churn.revenue_at_risk import (
+    compute_customer_revenue_at_risk,
+    compute_revenue_at_risk_summary,
+    compute_total_revenue_at_risk,
+)
 from retailpulse.ml.churn.train import (
     TASK_CHURN,
     ChurnTrainResult,
@@ -62,7 +67,10 @@ __all__ = [
     "compute_churn_labels",
     "compute_churn_labels_from_db",
     "compute_churn_metrics",
+    "compute_customer_revenue_at_risk",
     "compute_global_feature_importance",
+    "compute_revenue_at_risk_summary",
+    "compute_total_revenue_at_risk",
     "create_logistic_baseline_pipeline",
     "create_purged_temporal_split",
     "explain_churn_predictions",
