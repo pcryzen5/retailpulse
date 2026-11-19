@@ -124,3 +124,4 @@ def downgrade() -> None:
     """Drop inventory snapshot and policy simulation tables."""
     op.drop_table("policy_simulation", schema="ml")
     op.drop_table("inventory_snapshot", schema="core")
+

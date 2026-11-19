@@ -115,7 +115,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 
 ### Phase 4 — Inventory optimization
 - [x] **P4-01 Synthetic parameters.** `ml/inventory/params.py` and `retailpulse inventory seed-params` (deterministic; `source='synthetic'`), plus snapshots. *Verify:* same seed gives identical rows.
-- [ ] **P4-02 Policy functions.** Pure functions for SS, ROP, EOQ, stockout risk, order quantity with MOQ rounding. *Verify:* Hypothesis tests: non-negative, ROP ≥ μ_L, monotone in service level.
+- [x] **P4-02 Policy functions.** Pure functions for SS, ROP, EOQ, stockout risk, order quantity with MOQ rounding. *Verify:* Hypothesis tests: non-negative, ROP ≥ μ_L, monotone in service level.
 - [ ] **P4-03 Recommendations.** `recommend.py` using forecasts, σ_e from backtest residuals, params and snapshots; statuses; active pointer; CLI `score inventory`. *Verify:* integration test covering all four statuses.
 - [ ] **P4-04 Simulator.** `simulate.py`: lost-sales replay, seeded lead times, baseline policy; stores `ml.policy_simulation`. *Verify:* reproducible by seed; infinite-stock policy has fill rate 1.0 (test).
 - [ ] **P4-05 Simulation report.** `retailpulse inventory simulate` and `reports/inventory_simulation.md` with the synthetic-data caveat on top. *Verify:* report generated.
