@@ -310,3 +310,37 @@ class InventoryParam(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+
+class InventorySnapshot(Base):
+    """Daily inventory snapshot in core.inventory_snapshot."""
+
+    __tablename__ = "inventory_snapshot"
+    __table_args__ = (
+        CheckConstraint("on_hand >= 0", name="ck_inventory_snapshot_on_hand"),
+        CheckConstraint("on_order >= 0", name="ck_inventory_snapshot_on_order"),
+        CheckConstraint(
+            "source IN ('synthetic', 'upload')",
+            name="ck_inventory_snapshot_source",
+        ),
+        {"schema": "core"},
+    )
+
+    snapshot_date: Mapped[datetime.date] = mapped_column(
+        Date, ForeignKey("core.dim_date.date_key"), primary_key=True
+    )
+    store_id: Mapped[int] = mapped_column(
+        SmallInteger().with_variant(Integer, "sqlite"),
+        ForeignKey("core.dim_store.store_id"),
+        primary_key=True,
+    )
+    product_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        ForeignKey("core.dim_product.product_id"),
+        primary_key=True,
+    )
+    on_hand: Mapped[int] = mapped_column(Integer, nullable=False)
+    on_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    source: Mapped[str] = mapped_column(
+        String, default="synthetic", server_default="'synthetic'", nullable=False
+    )

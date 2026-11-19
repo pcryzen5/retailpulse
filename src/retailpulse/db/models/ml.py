@@ -355,3 +355,45 @@ class InventoryRecommendation(Base):
     generated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class PolicySimulation(Base):
+    """Inventory policy simulation run results in ml.policy_simulation."""
+
+    __tablename__ = "policy_simulation"
+    __table_args__ = ({"schema": "ml"},)
+
+    simulation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    forecast_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ml.model_run.run_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("app.app_user.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    window_start: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    window_end: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+    )
+    results: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+    )
+    uses_synthetic_params: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )

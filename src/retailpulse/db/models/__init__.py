@@ -11,6 +11,7 @@ from retailpulse.db.models.core import (
     FactDailySales,
     FactSalesLine,
     InventoryParam,
+    InventorySnapshot,
 )
 from retailpulse.db.models.ml import (
     ActiveOutput,
@@ -20,6 +21,7 @@ from retailpulse.db.models.ml import (
     ForecastMetric,
     InventoryRecommendation,
     ModelRun,
+    PolicySimulation,
     SegmentProfile,
 )
 from retailpulse.db.models.ops import DataQualityResult, IngestionBatch, PipelineRun
@@ -41,7 +43,9 @@ __all__ = [
     "IngestionBatch",
     "InventoryParam",
     "InventoryRecommendation",
+    "InventorySnapshot",
     "ModelRun",
     "PipelineRun",
+    "PolicySimulation",
     "SegmentProfile",
 ]

@@ -51,6 +51,8 @@ def test_models_metadata_conventions() -> None:
         "core.fact_sales_line",
         "core.fact_daily_sales",
         "core.inventory_param",
+        "core.inventory_snapshot",
+        "ml.policy_simulation",
     }
 
     actual_tables = set(Base.metadata.tables.keys())
@@ -96,6 +98,8 @@ def test_migrations_sql_generation() -> None:
     assert "CREATE TABLE core.fact_sales_line" in sql_up
     assert "CREATE TABLE core.fact_daily_sales" in sql_up
     assert "CREATE TABLE core.inventory_param" in sql_up
+    assert "CREATE TABLE core.inventory_snapshot" in sql_up
+    assert "CREATE TABLE ml.policy_simulation" in sql_up
     assert "INSERT INTO core.dim_store" in sql_up
 
     # 2. Reverse migration downgrade base SQL

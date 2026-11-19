@@ -164,3 +164,20 @@ def test_etl_run_end_to_end_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result_console.exit_code == 0
     assert "ETL completed successfully!" in result_console.output
     assert "Sales lines skipped:" in result_console.output
+
+
+def test_inventory_help() -> None:
+    """Verify retailpulse inventory --help displays commands."""
+    result = runner.invoke(app, ["inventory", "--help"])
+    assert result.exit_code == 0
+    assert "seed-params" in result.output
+
+
+def test_inventory_seed_params_help() -> None:
+    """Verify retailpulse inventory seed-params --help displays parameters."""
+    result = runner.invoke(app, ["inventory", "seed-params", "--help"])
+    assert result.exit_code == 0
+    assert "--as-of" in result.output
+    assert "--store-id" in result.output
+    assert "--seed" in result.output
+    assert "--json" in result.output

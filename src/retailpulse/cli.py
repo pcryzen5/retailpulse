@@ -1146,3 +1146,110 @@ def score_churn_command(
                 fg=color,
             )
         typer.echo()
+
+
+# =====================================================================
+# Inventory Optimization Subcommands
+# =====================================================================
+
+inventory_app = typer.Typer(
+    name="inventory",
+    help="Inventory optimization and parameter management commands.",
+    no_args_is_help=True,
+)
+app.add_typer(inventory_app, name="inventory")
+
+
+@inventory_app.command("seed-params")
+def seed_params_command(
+    as_of: Annotated[
+        str | None,
+        typer.Option(
+            "--as-of",
+            help="Snapshot date in YYYY-MM-DD format (defaults to latest complete date).",
+        ),
+    ] = None,
+    store_id: Annotated[
+        int,
+        typer.Option(
+            "--store-id",
+            help="Store ID to seed parameters and snapshots for.",
+        ),
+    ] = 1,
+    seed: Annotated[
+        int | None,
+        typer.Option(
+            "--seed",
+            help="Random seed for deterministic generation (defaults to config: 42).",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output results as JSON.",
+        ),
+    ] = False,
+) -> None:
+    """Seed deterministic synthetic inventory parameters and initial snapshots."""
+    from retailpulse.ml.inventory.params import seed_inventory_params  # noqa: PLC0415
+
+    parsed_as_of: datetime.date | None = None
+    if as_of:
+        try:
+            parsed_as_of = datetime.date.fromisoformat(as_of)
+        except ValueError as exc:
+            msg = f"Invalid date format '{as_of}': must be YYYY-MM-DD"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    if not json_output:
+        typer.secho(
+            "Seeding synthetic inventory parameters and snapshots...",
+            fg=typer.colors.CYAN,
+        )
+
+    try:
+        with session_scope() as session:
+            result = seed_inventory_params(
+                session=session,
+                store_id=store_id,
+                as_of=parsed_as_of,
+                seed=seed,
+            )
+    except Exception as exc:
+        if json_output:
+            typer.echo(json.dumps({"status": "failed", "error": str(exc)}))
+        else:
+            typer.secho(f"Inventory seeding failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    if json_output:
+        out = {
+            "status": "succeeded",
+            "store_id": result.store_id,
+            "data_as_of": str(result.data_as_of),
+            "n_params_seeded": result.n_params_seeded,
+            "n_snapshots_seeded": result.n_snapshots_seeded,
+            "seed": result.seed,
+            "source": result.source,
+        }
+        typer.echo(json.dumps(out, indent=2))
+    else:
+        typer.secho(
+            "\n================ Synthetic Inventory Parameters Seeded ================",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo(
+            f"Store ID: {result.store_id} | Snapshot Date: {result.data_as_of} | "
+            f"Seed: {result.seed} | Source: {result.source}"
+        )
+        typer.echo(
+            f"Parameters Seeded: {result.n_params_seeded:,} | "
+            f"Snapshots Seeded: {result.n_snapshots_seeded:,}"
+        )
+        typer.secho(
+            "Notice: Parameters and snapshots are synthetic for simulation purposes.",
+            fg=typer.colors.YELLOW,
+        )
+        typer.echo()

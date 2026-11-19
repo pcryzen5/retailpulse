@@ -114,7 +114,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P3-07 Revenue at risk and report.** Formula from TRD §5.3; `reports/churn_and_segments.md`. *Verify:* unit test on known inputs.
 
 ### Phase 4 — Inventory optimization
-- [ ] **P4-01 Synthetic parameters.** `ml/inventory/params.py` and `retailpulse inventory seed-params` (deterministic; `source='synthetic'`), plus snapshots. *Verify:* same seed gives identical rows.
+- [x] **P4-01 Synthetic parameters.** `ml/inventory/params.py` and `retailpulse inventory seed-params` (deterministic; `source='synthetic'`), plus snapshots. *Verify:* same seed gives identical rows.
 - [ ] **P4-02 Policy functions.** Pure functions for SS, ROP, EOQ, stockout risk, order quantity with MOQ rounding. *Verify:* Hypothesis tests: non-negative, ROP ≥ μ_L, monotone in service level.
 - [ ] **P4-03 Recommendations.** `recommend.py` using forecasts, σ_e from backtest residuals, params and snapshots; statuses; active pointer; CLI `score inventory`. *Verify:* integration test covering all four statuses.
 - [ ] **P4-04 Simulator.** `simulate.py`: lost-sales replay, seeded lead times, baseline policy; stores `ml.policy_simulation`. *Verify:* reproducible by seed; infinite-stock policy has fill rate 1.0 (test).
