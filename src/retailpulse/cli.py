@@ -1386,3 +1386,182 @@ def seed_params_command(
             fg=typer.colors.YELLOW,
         )
         typer.echo()
+
+
+@inventory_app.command("simulate")
+def simulate_inventory_command(  # noqa: PLR0917, PLR0915
+    store_id: Annotated[
+        int,
+        typer.Option("--store-id", help="Store identifier to simulate."),
+    ] = 1,
+    window_start: Annotated[
+        str | None,
+        typer.Option("--window-start", help="Simulation start date in YYYY-MM-DD format."),
+    ] = None,
+    window_end: Annotated[
+        str | None,
+        typer.Option("--window-end", help="Simulation end date in YYYY-MM-DD format."),
+    ] = None,
+    abc_class: Annotated[
+        str | None,
+        typer.Option("--abc-class", help="Scope filter: 'A', 'B', 'C', or 'all'."),
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option("--limit", help="Maximum number of SKUs to simulate (max 200)."),
+    ] = 100,
+    service_level: Annotated[
+        float | None,
+        typer.Option("--service-level", help="Target cycle service level for RetailPulse policy."),
+    ] = None,
+    cover_days_extra: Annotated[
+        int,
+        typer.Option(
+            "--cover-days-extra",
+            help="Extra cover days for baseline policy (default 14).",
+        ),
+    ] = 14,
+    seed: Annotated[
+        int | None,
+        typer.Option("--seed", help="Deterministic random seed (defaults to config: 42)."),
+    ] = None,
+    report: Annotated[
+        bool,
+        typer.Option("--report/--no-report", help="Generate markdown benchmark report."),
+    ] = True,
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="Output path for simulation markdown report."),
+    ] = Path("reports/inventory_simulation.md"),
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output results in JSON format."),
+    ] = False,
+) -> None:
+    """Run historical lost-sales inventory policy simulation and benchmark against baseline."""
+    from retailpulse.ml.inventory.report import generate_simulation_report  # noqa: PLC0415
+    from retailpulse.ml.inventory.simulate import (  # noqa: PLC0415
+        SimulationConfig,
+        run_policy_simulation,
+    )
+
+    parsed_start: datetime.date | None = None
+    if window_start:
+        try:
+            parsed_start = datetime.date.fromisoformat(window_start)
+        except ValueError as exc:
+            msg = f"Invalid window-start format '{window_start}': must be YYYY-MM-DD"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    parsed_end: datetime.date | None = None
+    if window_end:
+        try:
+            parsed_end = datetime.date.fromisoformat(window_end)
+        except ValueError as exc:
+            msg = f"Invalid window-end format '{window_end}': must be YYYY-MM-DD"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    if not json_output:
+        typer.secho("Executing inventory policy simulation replay...", fg=typer.colors.CYAN)
+
+    cfg = SimulationConfig(
+        store_id=store_id,
+        window_start=parsed_start,
+        window_end=parsed_end,
+        abc_class=abc_class,
+        limit=limit,
+        service_level=service_level,
+        cover_days_extra=cover_days_extra,
+        seed=seed,
+        persist=True,
+    )
+
+    try:
+        with session_scope() as session:
+            result = run_policy_simulation(session=session, config=cfg)
+            report_generated_path: Path | None = None
+            if report:
+                report_generated_path = generate_simulation_report(
+                    result=result,
+                    output_path=output,
+                    session=session,
+                )
+    except Exception as exc:
+        if json_output:
+            typer.echo(json.dumps({"status": "failed", "error": str(exc)}))
+        else:
+            typer.secho(f"Simulation failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    rp = result.results.get("retailpulse", {})
+    base = result.results.get("baseline", {})
+    delta = result.results.get("delta", {})
+
+    if json_output:
+        out = {
+            "status": "succeeded",
+            "simulation_id": str(result.simulation_id),
+            "window": {
+                "start": str(result.window_start),
+                "end": str(result.window_end),
+            },
+            "uses_synthetic_params": result.uses_synthetic_params,
+            "results": result.results,
+            "report_path": str(report_generated_path) if report_generated_path else None,
+        }
+        typer.echo(json.dumps(out, indent=2))
+    else:
+        typer.secho(
+            "\n================ Inventory Policy Simulation Completed ================",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo(
+            f"Simulation ID: {result.simulation_id} | "
+            f"Window: {result.window_start} to {result.window_end}"
+        )
+        typer.secho(
+            "Notice: Policy simulation evaluates synthetic inventory parameters.",
+            fg=typer.colors.YELLOW,
+        )
+        typer.echo("\nPolicy Benchmark Comparison:")
+        fill_rp = rp.get("fill_rate", 0.0) * 100.0
+        fill_base = base.get("fill_rate", 0.0) * 100.0
+        fill_diff = delta.get("fill_rate_diff", 0.0) * 100.0
+        typer.echo(
+            f"  - Demand Fill Rate:         RP {fill_rp:.2f}% vs Base {fill_base:.2f}% "
+            f"({fill_diff:+.2f} pp)"
+        )
+
+        stk_rp = rp.get("stockout_day_rate", 0.0) * 100.0
+        stk_base = base.get("stockout_day_rate", 0.0) * 100.0
+        stk_diff = delta.get("stockout_day_rate_diff", 0.0) * 100.0
+        typer.echo(
+            f"  - Stockout-Day Frequency:   RP {stk_rp:.2f}% vs Base {stk_base:.2f}% "
+            f"({stk_diff:+.2f} pp)"
+        )
+
+        val_rp = rp.get("avg_on_hand_value", 0.0)
+        val_base = base.get("avg_on_hand_value", 0.0)
+        val_diff = delta.get("avg_on_hand_value_diff", 0.0)
+        typer.echo(
+            f"  - Average Inventory Value:  RP £{val_rp:,.2f} vs Base £{val_base:,.2f} "
+            f"(£{val_diff:+,.2f})"
+        )
+
+        h_rp = rp.get("holding_cost", 0.0)
+        h_base = base.get("holding_cost", 0.0)
+        h_diff = delta.get("holding_cost_diff", 0.0)
+        typer.echo(
+            f"  - Total Holding Cost:       RP £{h_rp:,.2f} vs Base £{h_base:,.2f} "
+            f"(£{h_diff:+,.2f})"
+        )
+
+        ord_rp = rp.get("n_orders", 0)
+        ord_base = base.get("n_orders", 0)
+        typer.echo(f"  - Purchase Orders Placed:   RP {ord_rp:,} vs Base {ord_base:,}")
+
+        if report_generated_path:
+            typer.secho(f"\nReport written to: {report_generated_path}", fg=typer.colors.CYAN)
+        typer.echo()

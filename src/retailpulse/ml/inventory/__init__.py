@@ -26,6 +26,10 @@ from retailpulse.ml.inventory.recommend import (
     InventoryScoringResult,
     generate_inventory_recommendations,
 )
+from retailpulse.ml.inventory.report import (
+    generate_simulation_figures,
+    generate_simulation_report,
+)
 from retailpulse.ml.inventory.simulate import (
     PolicyMetrics,
     SimulationConfig,
@@ -52,6 +56,8 @@ __all__ = [
     "compute_stockout_risk",
     "evaluate_inventory_policy",
     "generate_inventory_recommendations",
+    "generate_simulation_figures",
+    "generate_simulation_report",
     "generate_synthetic_inventory_params",
     "generate_synthetic_inventory_snapshots",
     "round_order_quantity_to_moq",

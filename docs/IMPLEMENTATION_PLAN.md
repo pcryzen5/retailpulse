@@ -118,7 +118,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P4-02 Policy functions.** Pure functions for SS, ROP, EOQ, stockout risk, order quantity with MOQ rounding. *Verify:* Hypothesis tests: non-negative, ROP ≥ μ_L, monotone in service level.
 - [x] **P4-03 Recommendations.** `recommend.py` using forecasts, σ_e from backtest residuals, params and snapshots; statuses; active pointer; CLI `score inventory`. *Verify:* integration test covering all four statuses.
 - [x] **P4-04 Simulator.** `simulate.py`: lost-sales replay, seeded lead times, baseline policy; stores `ml.policy_simulation`. *Verify:* reproducible by seed; infinite-stock policy has fill rate 1.0 (test).
-- [ ] **P4-05 Simulation report.** `retailpulse inventory simulate` and `reports/inventory_simulation.md` with the synthetic-data caveat on top. *Verify:* report generated.
+- [x] **P4-05 Simulation report.** `retailpulse inventory simulate` and `reports/inventory_simulation.md` with the synthetic-data caveat on top. *Verify:* report generated.
 
 ### Phase 5 — API and auth
 - [ ] **P5-01 App factory.** Settings, lifespan, middleware (request ID, security headers, timing), RFC 9457 error handlers, `/health/*`. *Verify:* tests for error shape and headers.

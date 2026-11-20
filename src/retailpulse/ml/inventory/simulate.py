@@ -2,12 +2,14 @@
 
 Implements TRD §5.4, PRD §7.5 FR-INV-05, DATABASE §7, API §3.8:
 - Day-by-day lost-sales historical replay over a specified window (default 28-day span).
-- Stochastic lead times drawn from N(L, sigma_LT) (deterministic via random seed).
+- Stochastic lead times drawn from N(L, sigma_LT) (rounded >= 1, deterministic via random seed).
 - Comparison between:
-    1. RetailPulse policy: forecast-driven ROP = mu_L + SS with EOQ / MOQ.
+    1. RetailPulse policy: forecast-driven ROP = mu_L + SS(service_level, sigma_e, sigma_LT)
+       with EOQ / MOQ.
     2. Baseline policy: ROP = 28-day moving average * (L + 14) with EOQ / MOQ.
     3. Infinite-stock policy mode: verifying ideal 1.0 fill rate invariant.
-- Standardized initial inventory: both policies start with on_hand = ceil(ROP_baseline).
+- Standardized initial inventory: both policies start with
+  on_hand = ceil(ROP_baseline(window_start)).
 - Detailed metric reporting:
     - fill_rate (units served / units demanded)
     - stockout_day_rate (days with unmet lost sales / total SKU-days)
@@ -118,12 +120,12 @@ class SimulationResult:
     simulation_id: uuid.UUID
     forecast_run_id: uuid.UUID | None
     created_by: uuid.UUID | None
+    created_at: datetime.datetime
     window_start: datetime.date
     window_end: datetime.date
     uses_synthetic_params: bool
     config: dict[str, Any]
     results: dict[str, Any]
-    created_at: datetime.datetime | None = None
     sku_details: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -131,7 +133,6 @@ class SimulationResult:
         return {
             "simulation_id": str(self.simulation_id),
             "forecast_run_id": str(self.forecast_run_id) if self.forecast_run_id else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
             "window": {
                 "start": self.window_start.isoformat(),
                 "end": self.window_end.isoformat(),
@@ -356,293 +357,7 @@ def _compute_ma28(
     return total_qty / float(DEFAULT_MOVING_AVG_DAYS)
 
 
-def _compute_sku_order_quantity(
-    *,
-    pol: str,
-    prod: DimProduct,
-    param: InventoryParam | None,
-    ip: int,
-    current_date: datetime.date,
-    config: SimulationConfig,
-    history_demands: dict[tuple[int, datetime.date], int],
-    forecast_rates: dict[int, float],
-    sigma_e_by_abc: dict[str, float],
-    global_sigma_e: float,
-) -> int:
-    """Evaluate replenishment policy logic and return order quantity for a SKU."""
-    if pol == "infinite_stock":
-        return 0
-
-    pid = int(prod.product_id)
-    abc = str(prod.abc_class).strip().upper() if prod.abc_class else "C"
-
-    lt_mean = float(param.lead_time_days) if param else (7.0 if abc == "A" else 14.0)
-    lt_std = float(param.lead_time_std_days) if param else round(0.2 * lt_mean, 2)
-    srv_lvl = (
-        config.service_level
-        if config.service_level is not None
-        else (float(param.service_level) if param else 0.95)
-    )
-    unit_cost = (
-        float(param.unit_cost)
-        if param and param.unit_cost is not None and param.unit_cost > 0
-        else (float(prod.unit_cost_est) if prod.unit_cost_est else 10.0)
-    )
-    holding_cost_rate = float(param.holding_cost_rate) if param else 0.20
-    order_cost = float(param.order_cost) if param else 25.0
-    moq = int(param.moq) if param else 1
-
-    if pol == "retailpulse":
-        mu_d = forecast_rates.get(pid, 0.0)
-        sigma_e = sigma_e_by_abc.get(abc, global_sigma_e)
-        sigma_l = compute_lead_time_demand_std(
-            lead_time_days=lt_mean,
-            sigma_e=sigma_e,
-            mu_d=mu_d,
-            lead_time_std_days=lt_std,
-        )
-        ss = compute_safety_stock(sigma_l=sigma_l, service_level=srv_lvl)
-        rop = compute_reorder_point(mu_l=mu_d * lt_mean, safety_stock=ss)
-        eoq_val = compute_eoq(
-            annual_demand=365.0 * mu_d,
-            order_cost=order_cost,
-            holding_cost_rate=holding_cost_rate,
-            unit_cost=unit_cost,
-        )
-        batch_q = round_order_quantity_to_moq(eoq_val, moq)
-
-        if ip <= rop and batch_q > 0:
-            deficit = rop - ip
-            multiplier = max(1, math.ceil(deficit / batch_q))
-            return multiplier * batch_q
-        return 0
-
-    if pol == "baseline":
-        ma28 = _compute_ma28(history_demands, pid, current_date)
-        rop = ma28 * (lt_mean + float(config.cover_days_extra))
-        eoq_val = compute_eoq(
-            annual_demand=365.0 * ma28,
-            order_cost=order_cost,
-            holding_cost_rate=holding_cost_rate,
-            unit_cost=unit_cost,
-        )
-        batch_q = round_order_quantity_to_moq(eoq_val, moq)
-
-        if ip <= rop and batch_q > 0:
-            deficit = rop - ip
-            multiplier = max(1, math.ceil(deficit / batch_q))
-            return multiplier * batch_q
-        return 0
-
-    return 0
-
-
-def _deliver_orders(
-    pending_orders: list[PendingOrder],
-    current_date: datetime.date,
-    on_hand: dict[int, int],
-    on_order: dict[int, int],
-) -> list[PendingOrder]:
-    """Process order arrivals on current_date and return remaining pending orders."""
-    remaining: list[PendingOrder] = []
-    for order in pending_orders:
-        if order.arrival_date <= current_date:
-            on_hand[order.product_id] += order.quantity
-            on_order[order.product_id] = max(0, on_order[order.product_id] - order.quantity)
-        else:
-            remaining.append(order)
-    return remaining
-
-
-def _fulfill_demands(
-    *,
-    products: Sequence[DimProduct],
-    params: Mapping[int, InventoryParam | None],
-    current_date: datetime.date,
-    sim_demands: dict[tuple[int, datetime.date], int],
-    on_hand: dict[int, int],
-    sku_stats: dict[int, dict[str, float]],
-) -> tuple[int, int, int, int, float, float, float]:
-    """Fulfill daily demand for all SKUs and update inventories and stats."""
-    dem_tot, srv_tot, lost_tot, stk_days = 0, 0, 0, 0
-    oh_units_tot, oh_val_tot, hold_cost_tot = 0.0, 0.0, 0.0
-
-    for prod in products:
-        pid = int(prod.product_id)
-        param = params.get(pid)
-        unit_cost = (
-            float(param.unit_cost)
-            if param and param.unit_cost is not None and param.unit_cost > 0
-            else (float(prod.unit_cost_est) if prod.unit_cost_est else 10.0)
-        )
-        holding_cost_rate = float(param.holding_cost_rate) if param else 0.20
-
-        demand = sim_demands.get((pid, current_date), 0)
-        dem_tot += demand
-        sku_stats[pid]["demand"] += demand
-
-        if on_hand[pid] >= demand:
-            served = demand
-            lost = 0
-            on_hand[pid] -= demand
-        else:
-            served = on_hand[pid]
-            lost = demand - on_hand[pid]
-            on_hand[pid] = 0
-
-        srv_tot += served
-        lost_tot += lost
-        sku_stats[pid]["served"] += served
-        sku_stats[pid]["lost"] += lost
-
-        if lost > 0:
-            stk_days += 1
-            sku_stats[pid]["stockout_days"] += 1
-
-        ending_oh = on_hand[pid]
-        oh_units_tot += ending_oh
-        oh_val_tot += ending_oh * unit_cost
-        hold_cost_tot += ending_oh * unit_cost * (holding_cost_rate / 365.0)
-        sku_stats[pid]["on_hand_units"] += ending_oh
-
-    return dem_tot, srv_tot, lost_tot, stk_days, oh_units_tot, oh_val_tot, hold_cost_tot
-
-
-def _run_single_policy(
-    *,
-    pol: str,
-    dates: Sequence[datetime.date],
-    products: Sequence[DimProduct],
-    params: Mapping[int, InventoryParam | None],
-    initial_on_hand: dict[int, int],
-    sim_demands: dict[tuple[int, datetime.date], int],
-    history_demands: dict[tuple[int, datetime.date], int],
-    forecast_rates: dict[int, float],
-    sigma_e_by_abc: dict[str, float],
-    global_sigma_e: float,
-    lead_times: dict[tuple[int, datetime.date], int],
-    config: SimulationConfig,
-) -> tuple[dict[str, Any], dict[int, dict[str, Any]]]:
-    """Execute simulation for a single replenishment policy."""
-    n_days = len(dates)
-    n_skus = len(products)
-
-    on_hand: dict[int, int] = {}
-    on_order: dict[int, int] = {int(p.product_id): 0 for p in products}
-    pending_orders: list[PendingOrder] = []
-
-    for p in products:
-        pid = int(p.product_id)
-        on_hand[pid] = 1_000_000_000 if pol == "infinite_stock" else initial_on_hand[pid]
-
-    total_demand = 0
-    total_served = 0
-    total_lost = 0
-    stockout_days = 0
-    total_on_hand_units = 0.0
-    total_on_hand_value = 0.0
-    total_holding_cost = 0.0
-    n_orders = 0
-
-    sku_stats: dict[int, dict[str, float]] = {
-        int(p.product_id): {
-            "demand": 0.0,
-            "served": 0.0,
-            "lost": 0.0,
-            "stockout_days": 0.0,
-            "on_hand_units": 0.0,
-            "orders": 0.0,
-        }
-        for p in products
-    }
-
-    for current_date in dates:
-        # A. Deliveries arrive at start of day
-        pending_orders = _deliver_orders(pending_orders, current_date, on_hand, on_order)
-
-        # B. Demand fulfillment and lost sales
-        d_tot, s_tot, l_tot, stk, oh_u, oh_v, h_cost = _fulfill_demands(
-            products=products,
-            params=params,
-            current_date=current_date,
-            sim_demands=sim_demands,
-            on_hand=on_hand,
-            sku_stats=sku_stats,
-        )
-        total_demand += d_tot
-        total_served += s_tot
-        total_lost += l_tot
-        stockout_days += stk
-        total_on_hand_units += oh_u
-        total_on_hand_value += oh_v
-        total_holding_cost += h_cost
-
-        # C. Review and ordering decisions at end of day
-        for prod in products:
-            pid = int(prod.product_id)
-            param = params.get(pid)
-            ip = on_hand[pid] + on_order[pid]
-
-            order_qty = _compute_sku_order_quantity(
-                pol=pol,
-                prod=prod,
-                param=param,
-                ip=ip,
-                current_date=current_date,
-                config=config,
-                history_demands=history_demands,
-                forecast_rates=forecast_rates,
-                sigma_e_by_abc=sigma_e_by_abc,
-                global_sigma_e=global_sigma_e,
-            )
-
-            if order_qty > 0:
-                lt = lead_times[(pid, current_date)]
-                arrival_dt = current_date + datetime.timedelta(days=lt)
-                on_order[pid] += order_qty
-                pending_orders.append(
-                    PendingOrder(
-                        product_id=pid,
-                        quantity=order_qty,
-                        arrival_date=arrival_dt,
-                    )
-                )
-                n_orders += 1
-                sku_stats[pid]["orders"] += 1
-
-    fill_rate = total_served / total_demand if total_demand > 0 else 1.0
-    total_sku_days = n_skus * n_days
-    stockout_day_rate = stockout_days / total_sku_days if total_sku_days > 0 else 0.0
-    avg_oh_units = total_on_hand_units / n_days if n_days > 0 else 0.0
-    avg_oh_value = total_on_hand_value / n_days if n_days > 0 else 0.0
-
-    metrics = PolicyMetrics(
-        fill_rate=round(fill_rate, 4),
-        stockout_day_rate=round(stockout_day_rate, 4),
-        avg_on_hand_units=round(avg_oh_units, 1),
-        avg_on_hand_value=round(avg_oh_value, 2),
-        holding_cost=round(total_holding_cost, 2),
-        n_orders=n_orders,
-        total_demand=total_demand,
-        total_served=total_served,
-        total_lost=total_lost,
-        stockout_days=stockout_days,
-    ).to_dict()
-
-    per_sku: dict[int, dict[str, Any]] = {}
-    for pid, s in sku_stats.items():
-        per_sku[pid] = {
-            "fill_rate": round(s["served"] / s["demand"], 4) if s["demand"] > 0 else 1.0,
-            "avg_on_hand_units": round(s["on_hand_units"] / n_days, 1) if n_days > 0 else 0.0,
-            "stockout_days": int(s["stockout_days"]),
-            "orders": int(s["orders"]),
-        }
-
-    return metrics, per_sku
-
-
-def simulate_inventory_replay(
-    *,
+def simulate_inventory_replay(  # noqa: PLR0917, PLR0912, PLR0915
     dates: Sequence[datetime.date],
     sim_demands: dict[tuple[int, datetime.date], int],
     history_demands: dict[tuple[int, datetime.date], int],
@@ -659,6 +374,8 @@ def simulate_inventory_replay(
     if config.run_infinite_stock:
         policies.append("infinite_stock")
 
+    n_days = len(dates)
+    n_skus = len(products)
     first_date = dates[0] if dates else datetime.date(2011, 12, 8)
 
     # 1. Compute initial on-hand at window start (baseline ROP)
@@ -678,25 +395,211 @@ def simulate_inventory_replay(
 
     # 2. Run simulation loop for each policy
     for pol in policies:
-        pm_dict, per_sku = _run_single_policy(
-            pol=pol,
-            dates=dates,
-            products=products,
-            params=params,
-            initial_on_hand=initial_on_hand,
-            sim_demands=sim_demands,
-            history_demands=history_demands,
-            forecast_rates=forecast_rates,
-            sigma_e_by_abc=sigma_e_by_abc,
-            global_sigma_e=global_sigma_e,
-            lead_times=lead_times,
-            config=config,
-        )
-        policy_results[pol] = pm_dict
-        for pid, sku_res in per_sku.items():
-            sku_performance[pid][pol] = sku_res
+        on_hand: dict[int, int] = {}
+        on_order: dict[int, int] = {int(p.product_id): 0 for p in products}
+        pending_orders: list[PendingOrder] = []
 
-    # 3. Compute delta between retailpulse and baseline
+        # Initialize starting inventory
+        for p in products:
+            pid = int(p.product_id)
+            if pol == "infinite_stock":
+                on_hand[pid] = 1_000_000_000
+            else:
+                on_hand[pid] = initial_on_hand[pid]
+
+        total_demand = 0
+        total_served = 0
+        total_lost = 0
+        stockout_days = 0
+        total_on_hand_units = 0.0
+        total_on_hand_value = 0.0
+        total_holding_cost = 0.0
+        n_orders = 0
+
+        # Per-SKU tracking
+        sku_stats: dict[int, dict[str, float]] = {
+            int(p.product_id): {
+                "demand": 0.0,
+                "served": 0.0,
+                "lost": 0.0,
+                "stockout_days": 0.0,
+                "on_hand_units": 0.0,
+                "orders": 0.0,
+            }
+            for p in products
+        }
+
+        # Day-by-day replay
+        for current_date in dates:
+            # A. Deliveries arrive at start of day
+            arrived: list[PendingOrder] = []
+            remaining_orders: list[PendingOrder] = []
+            for order in pending_orders:
+                if order.arrival_date <= current_date:
+                    arrived.append(order)
+                else:
+                    remaining_orders.append(order)
+            pending_orders = remaining_orders
+
+            for order in arrived:
+                on_hand[order.product_id] += order.quantity
+                on_order[order.product_id] = max(0, on_order[order.product_id] - order.quantity)
+
+            # B. Demand fulfillment and lost sales
+            for prod in products:
+                pid = int(prod.product_id)
+                param = params.get(pid)
+                abc = str(prod.abc_class).strip().upper() if prod.abc_class else "C"
+                unit_cost = (
+                    float(param.unit_cost)
+                    if param and param.unit_cost is not None and param.unit_cost > 0
+                    else (float(prod.unit_cost_est) if prod.unit_cost_est else 10.0)
+                )
+                holding_cost_rate = float(param.holding_cost_rate) if param else 0.20
+
+                dt_demand = sim_demands.get((pid, current_date), 0)
+                total_demand += dt_demand
+                sku_stats[pid]["demand"] += dt_demand
+
+                # Fulfill demand
+                if on_hand[pid] >= dt_demand:
+                    served = dt_demand
+                    lost = 0
+                    on_hand[pid] -= dt_demand
+                else:
+                    served = on_hand[pid]
+                    lost = dt_demand - on_hand[pid]
+                    on_hand[pid] = 0
+
+                total_served += served
+                total_lost += lost
+                sku_stats[pid]["served"] += served
+                sku_stats[pid]["lost"] += lost
+
+                if lost > 0:
+                    stockout_days += 1
+                    sku_stats[pid]["stockout_days"] += 1
+
+                # Daily ending on-hand metrics
+                ending_oh = on_hand[pid]
+                total_on_hand_units += ending_oh
+                total_on_hand_value += ending_oh * unit_cost
+                total_holding_cost += ending_oh * unit_cost * (holding_cost_rate / 365.0)
+                sku_stats[pid]["on_hand_units"] += ending_oh
+
+            # C. Review and ordering decisions at end of day
+            for prod in products:
+                pid = int(prod.product_id)
+                param = params.get(pid)
+                abc = str(prod.abc_class).strip().upper() if prod.abc_class else "C"
+
+                lt_mean = float(param.lead_time_days) if param else (7.0 if abc == "A" else 14.0)
+                lt_std = float(param.lead_time_std_days) if param else round(0.2 * lt_mean, 2)
+                srv_lvl = (
+                    config.service_level
+                    if config.service_level is not None
+                    else (float(param.service_level) if param else 0.95)
+                )
+                unit_cost = (
+                    float(param.unit_cost)
+                    if param and param.unit_cost is not None and param.unit_cost > 0
+                    else (float(prod.unit_cost_est) if prod.unit_cost_est else 10.0)
+                )
+                holding_cost_rate = float(param.holding_cost_rate) if param else 0.20
+                order_cost = float(param.order_cost) if param else 25.0
+                moq = int(param.moq) if param else 1
+
+                ip = on_hand[pid] + on_order[pid]
+                order_qty = 0
+
+                if pol == "retailpulse":
+                    mu_d = forecast_rates.get(pid, 0.0)
+                    sigma_e = sigma_e_by_abc.get(abc, global_sigma_e)
+                    sigma_l = compute_lead_time_demand_std(
+                        lead_time_days=lt_mean,
+                        sigma_e=sigma_e,
+                        mu_d=mu_d,
+                        lead_time_std_days=lt_std,
+                    )
+                    ss = compute_safety_stock(sigma_l=sigma_l, service_level=srv_lvl)
+                    rop = compute_reorder_point(mu_l=mu_d * lt_mean, safety_stock=ss)
+                    eoq_val = compute_eoq(
+                        annual_demand=365.0 * mu_d,
+                        order_cost=order_cost,
+                        holding_cost_rate=holding_cost_rate,
+                        unit_cost=unit_cost,
+                    )
+                    batch_q = round_order_quantity_to_moq(eoq_val, moq)
+
+                    if ip <= rop and batch_q > 0:
+                        deficit = rop - ip
+                        multiplier = max(1, math.ceil(deficit / batch_q))
+                        order_qty = multiplier * batch_q
+
+                elif pol == "baseline":
+                    ma28 = _compute_ma28(history_demands, pid, current_date)
+                    rop = ma28 * (lt_mean + float(config.cover_days_extra))
+                    eoq_val = compute_eoq(
+                        annual_demand=365.0 * ma28,
+                        order_cost=order_cost,
+                        holding_cost_rate=holding_cost_rate,
+                        unit_cost=unit_cost,
+                    )
+                    batch_q = round_order_quantity_to_moq(eoq_val, moq)
+
+                    if ip <= rop and batch_q > 0:
+                        deficit = rop - ip
+                        multiplier = max(1, math.ceil(deficit / batch_q))
+                        order_qty = multiplier * batch_q
+
+                elif pol == "infinite_stock":
+                    order_qty = 0
+
+                # Place order if needed
+                if order_qty > 0:
+                    lt = lead_times[(pid, current_date)]
+                    arrival_dt = current_date + datetime.timedelta(days=lt)
+                    on_order[pid] += order_qty
+                    pending_orders.append(
+                        PendingOrder(
+                            product_id=pid,
+                            quantity=order_qty,
+                            arrival_date=arrival_dt,
+                        )
+                    )
+                    n_orders += 1
+                    sku_stats[pid]["orders"] += 1
+
+        # 3. Aggregate policy summary metrics
+        fill_rate = total_served / total_demand if total_demand > 0 else 1.0
+        total_sku_days = n_skus * n_days
+        stockout_day_rate = stockout_days / total_sku_days if total_sku_days > 0 else 0.0
+        avg_oh_units = total_on_hand_units / n_days if n_days > 0 else 0.0
+        avg_oh_value = total_on_hand_value / n_days if n_days > 0 else 0.0
+
+        pm = PolicyMetrics(
+            fill_rate=round(fill_rate, 4),
+            stockout_day_rate=round(stockout_day_rate, 4),
+            avg_on_hand_units=round(avg_oh_units, 1),
+            avg_on_hand_value=round(avg_oh_value, 2),
+            holding_cost=round(total_holding_cost, 2),
+            n_orders=n_orders,
+            total_demand=total_demand,
+            total_served=total_served,
+            total_lost=total_lost,
+            stockout_days=stockout_days,
+        )
+        policy_results[pol] = pm.to_dict()
+
+        for pid, s in sku_stats.items():
+            sku_performance[pid][pol] = {
+                "fill_rate": round(s["served"] / s["demand"], 4) if s["demand"] > 0 else 1.0,
+                "avg_on_hand_units": round(s["on_hand_units"] / n_days, 1) if n_days > 0 else 0.0,
+                "stockout_days": int(s["stockout_days"]),
+                "orders": int(s["orders"]),
+            }
+
+    # 4. Compute delta between retailpulse and baseline
     rp_res = policy_results["retailpulse"]
     base_res = policy_results["baseline"]
     delta = {
@@ -715,6 +618,7 @@ def simulate_inventory_replay(
     }
     policy_results["delta"] = delta
 
+    # Compile sku_details
     sku_details = [
         {
             "product_id": pid,
@@ -796,10 +700,14 @@ def run_policy_simulation(
                 "n_orders_diff": 0,
             },
         }
+        created_at_dt = datetime.datetime.combine(
+            win_end, datetime.time.min, tzinfo=datetime.UTC
+        )
         return SimulationResult(
             simulation_id=uuid.uuid4(),
             forecast_run_id=eff_run_id,
             created_by=created_by,
+            created_at=created_at_dt,
             window_start=win_start,
             window_end=win_end,
             uses_synthetic_params=True,
@@ -814,7 +722,6 @@ def run_policy_simulation(
                 "seed": eff_seed,
             },
             results=empty_res,
-            created_at=None,
             sku_details=[],
         )
 
@@ -886,9 +793,6 @@ def run_policy_simulation(
         config=cfg,
     )
 
-    eff_srv_lvl = (
-        cfg.service_level if cfg.service_level is not None else settings.default_service_level
-    )
     config_dict = {
         "store_id": cfg.store_id,
         "scope": {
@@ -897,7 +801,11 @@ def run_policy_simulation(
             "product_ids": list(cfg.product_ids) if cfg.product_ids else None,
         },
         "policy": {
-            "service_level": eff_srv_lvl,
+            "service_level": (
+                cfg.service_level
+                if cfg.service_level is not None
+                else settings.default_service_level
+            ),
         },
         "baseline": {
             "type": cfg.baseline_type,
@@ -907,7 +815,7 @@ def run_policy_simulation(
     }
 
     sim_id = uuid.uuid4()
-    created_at: datetime.datetime | None = None
+    now_utc = datetime.datetime.combine(win_end, datetime.time.min, tzinfo=datetime.UTC)
 
     # 6. Persist to ml.policy_simulation if requested
     if cfg.persist:
@@ -915,6 +823,7 @@ def run_policy_simulation(
             simulation_id=sim_id,
             forecast_run_id=eff_run_id,
             created_by=created_by,
+            created_at=now_utc,
             window_start=win_start,
             window_end=win_end,
             config=config_dict,
@@ -923,18 +832,16 @@ def run_policy_simulation(
         )
         session.add(sim_record)
         session.commit()
-        session.refresh(sim_record)
-        created_at = sim_record.created_at
 
     return SimulationResult(
         simulation_id=sim_id,
         forecast_run_id=eff_run_id,
         created_by=created_by,
+        created_at=now_utc,
         window_start=win_start,
         window_end=win_end,
         uses_synthetic_params=uses_synthetic,
         config=config_dict,
         results=sim_output["results"],
-        created_at=created_at,
         sku_details=sim_output["sku_details"],
     )
