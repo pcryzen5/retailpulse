@@ -26,11 +26,21 @@ from retailpulse.ml.inventory.recommend import (
     InventoryScoringResult,
     generate_inventory_recommendations,
 )
+from retailpulse.ml.inventory.simulate import (
+    PolicyMetrics,
+    SimulationConfig,
+    SimulationResult,
+    run_policy_simulation,
+    simulate_inventory_replay,
+)
 
 __all__ = [
     "InventoryPolicyEvaluation",
     "InventoryScoringResult",
     "InventorySeedResult",
+    "PolicyMetrics",
+    "SimulationConfig",
+    "SimulationResult",
     "classify_inventory_status",
     "compute_days_of_cover",
     "compute_empirical_stockout_risk",
@@ -45,5 +55,7 @@ __all__ = [
     "generate_synthetic_inventory_params",
     "generate_synthetic_inventory_snapshots",
     "round_order_quantity_to_moq",
+    "run_policy_simulation",
     "seed_inventory_params",
+    "simulate_inventory_replay",
 ]
