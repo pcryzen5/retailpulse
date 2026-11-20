@@ -22,9 +22,14 @@ from retailpulse.ml.inventory.policy import (
     evaluate_inventory_policy,
     round_order_quantity_to_moq,
 )
+from retailpulse.ml.inventory.recommend import (
+    InventoryScoringResult,
+    generate_inventory_recommendations,
+)
 
 __all__ = [
     "InventoryPolicyEvaluation",
+    "InventoryScoringResult",
     "InventorySeedResult",
     "classify_inventory_status",
     "compute_days_of_cover",
@@ -36,6 +41,7 @@ __all__ = [
     "compute_safety_stock",
     "compute_stockout_risk",
     "evaluate_inventory_policy",
+    "generate_inventory_recommendations",
     "generate_synthetic_inventory_params",
     "generate_synthetic_inventory_snapshots",
     "round_order_quantity_to_moq",

@@ -302,7 +302,7 @@ class InventoryRecommendation(Base):
     __tablename__ = "inventory_recommendation"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('ok', 'reorder_now', 'stockout_risk', 'no_data')",
+            "status IN ('ok', 'reorder_now', 'overstock', 'stockout_risk', 'no_data')",
             name="ck_inventory_rec_status",
         ),
         CheckConstraint("reorder_urgency BETWEEN 0 AND 100", name="ck_inventory_rec_urgency"),
@@ -337,10 +337,14 @@ class InventoryRecommendation(Base):
         ForeignKey("core.dim_product.product_id"),
         nullable=False,
     )
-    lead_time_days: Mapped[int] = mapped_column(
-        SmallInteger().with_variant(Integer, "sqlite"), nullable=False
+    on_hand: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    on_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    lead_time_days: Mapped[Decimal] = mapped_column(
+        Numeric(5, 1).with_variant(Numeric(5, 1), "sqlite"), nullable=False
     )
     service_level: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False)
+    demand_mean_lt: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    demand_std_lt: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
     reorder_point: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     order_quantity: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     safety_stock: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
@@ -349,12 +353,34 @@ class InventoryRecommendation(Base):
         SmallInteger().with_variant(Integer, "sqlite"), nullable=False
     )
     expected_stockout_prob: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    days_of_cover: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
     holding_cost_rate: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
     order_cost: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     unit_cost: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    params_source: Mapped[str] = mapped_column(
+        String, default="synthetic", server_default="'synthetic'", nullable=False
+    )
     generated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    @property
+    def recommended_order_qty(self) -> Decimal:
+        """Alias for order_quantity."""
+        return self.order_quantity
+
+    @recommended_order_qty.setter
+    def recommended_order_qty(self, value: Decimal) -> None:
+        self.order_quantity = value
+
+    @property
+    def stockout_risk(self) -> Decimal:
+        """Alias for expected_stockout_prob."""
+        return self.expected_stockout_prob
+
+    @stockout_risk.setter
+    def stockout_risk(self, value: Decimal) -> None:
+        self.expected_stockout_prob = value
 
 
 class PolicySimulation(Base):

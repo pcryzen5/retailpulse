@@ -119,9 +119,66 @@ def upgrade() -> None:
         schema="ml",
     )
 
+    # 3. Alter ml.inventory_recommendation to add inventory context columns
+    op.add_column(
+        "inventory_recommendation",
+        sa.Column("on_hand", sa.Integer(), server_default=sa.text("0"), nullable=False),
+        schema="ml",
+    )
+    op.add_column(
+        "inventory_recommendation",
+        sa.Column("on_order", sa.Integer(), server_default=sa.text("0"), nullable=False),
+        schema="ml",
+    )
+    op.add_column(
+        "inventory_recommendation",
+        sa.Column("demand_mean_lt", sa.Numeric(14, 4), nullable=True),
+        schema="ml",
+    )
+    op.add_column(
+        "inventory_recommendation",
+        sa.Column("demand_std_lt", sa.Numeric(14, 4), nullable=True),
+        schema="ml",
+    )
+    op.add_column(
+        "inventory_recommendation",
+        sa.Column("days_of_cover", sa.Numeric(8, 2), nullable=True),
+        schema="ml",
+    )
+    op.add_column(
+        "inventory_recommendation",
+        sa.Column(
+            "params_source", sa.Text(), server_default=sa.text("'synthetic'"), nullable=False
+        ),
+        schema="ml",
+    )
+    op.drop_constraint(
+        "ck_inventory_rec_status", "inventory_recommendation", schema="ml", type_="check"
+    )
+    op.create_check_constraint(
+        "ck_inventory_rec_status",
+        "inventory_recommendation",
+        "status IN ('ok', 'reorder_now', 'overstock', 'stockout_risk', 'no_data')",
+        schema="ml",
+    )
+
 
 def downgrade() -> None:
-    """Drop inventory snapshot and policy simulation tables."""
+    """Drop inventory snapshot and policy simulation tables and revert recommendation columns."""
+    op.drop_constraint(
+        "ck_inventory_rec_status", "inventory_recommendation", schema="ml", type_="check"
+    )
+    op.create_check_constraint(
+        "ck_inventory_rec_status",
+        "inventory_recommendation",
+        "status IN ('ok', 'reorder_now', 'stockout_risk', 'no_data')",
+        schema="ml",
+    )
+    op.drop_column("inventory_recommendation", "params_source", schema="ml")
+    op.drop_column("inventory_recommendation", "days_of_cover", schema="ml")
+    op.drop_column("inventory_recommendation", "demand_std_lt", schema="ml")
+    op.drop_column("inventory_recommendation", "demand_mean_lt", schema="ml")
+    op.drop_column("inventory_recommendation", "on_order", schema="ml")
+    op.drop_column("inventory_recommendation", "on_hand", schema="ml")
     op.drop_table("policy_simulation", schema="ml")
     op.drop_table("inventory_snapshot", schema="core")
-

@@ -1148,6 +1148,139 @@ def score_churn_command(
         typer.echo()
 
 
+@score_app.command("inventory")
+def score_inventory_command(
+    store_id: Annotated[
+        int,
+        typer.Option(
+            "--store-id",
+            help="Store ID to generate recommendations for (defaults to 1).",
+        ),
+    ] = 1,
+    data_as_of: Annotated[
+        str | None,
+        typer.Option(
+            "--data-as-of",
+            help="Origin cutoff date in YYYY-MM-DD format (defaults to latest complete date).",
+        ),
+    ] = None,
+    forecast_run_id: Annotated[
+        str | None,
+        typer.Option(
+            "--forecast-run-id",
+            help="Optional explicit forecast model_run_id UUID (defaults to active champion).",
+        ),
+    ] = None,
+    overstock_days: Annotated[
+        float | None,
+        typer.Option(
+            "--overstock-days",
+            help="Days of cover threshold for overstock status (defaults to config: 90.0).",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output execution summary in JSON format.",
+        ),
+    ] = False,
+) -> None:
+    """Generate replenishment recommendations and update ml.active_output."""
+    from retailpulse.ml.inventory.recommend import (  # noqa: PLC0415
+        generate_inventory_recommendations,
+    )
+
+    parsed_as_of: datetime.date | None = None
+    if data_as_of:
+        try:
+            parsed_as_of = datetime.date.fromisoformat(data_as_of)
+        except ValueError as exc:
+            msg = f"Invalid date format '{data_as_of}': must be YYYY-MM-DD"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    parsed_run_id: uuid.UUID | None = None
+    if forecast_run_id:
+        try:
+            parsed_run_id = uuid.UUID(forecast_run_id)
+        except ValueError as exc:
+            msg = f"Invalid UUID format '{forecast_run_id}'"
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+    if not json_output:
+        typer.secho(
+            "Generating inventory replenishment recommendations...",
+            fg=typer.colors.CYAN,
+        )
+
+    try:
+        with session_scope() as session:
+            result = generate_inventory_recommendations(
+                session=session,
+                store_id=store_id,
+                data_as_of=parsed_as_of,
+                forecast_run_id=parsed_run_id,
+                overstock_days=overstock_days,
+            )
+    except Exception as exc:
+        if json_output:
+            typer.echo(json.dumps({"status": "failed", "error": str(exc)}))
+        else:
+            typer.secho(f"Inventory recommendation failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    if json_output:
+        out = {
+            "status": "succeeded",
+            "forecast_run_id": str(result.forecast_run_id),
+            "store_id": result.store_id,
+            "data_as_of": str(result.data_as_of),
+            "n_recommendations": result.n_recommendations,
+            "status_counts": result.status_counts,
+            "mean_stockout_risk": round(result.mean_stockout_risk, 4),
+            "total_recommended_order_qty": result.total_recommended_order_qty,
+            "active_output_updated": result.active_output_updated,
+        }
+        typer.echo(json.dumps(out, indent=2))
+    else:
+        typer.secho(
+            "\n================ Inventory Recommendations Generated ================",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo(f"Forecast Run ID: {result.forecast_run_id} | Store ID: {result.store_id}")
+        typer.echo(
+            f"Data As Of: {result.data_as_of} | SKUs Evaluated: {result.n_recommendations:,} | "
+            f"Mean Stockout Risk: {result.mean_stockout_risk:.2%}"
+        )
+        typer.echo(f"Total Recommended Order Qty: {result.total_recommended_order_qty:,} units")
+        typer.secho(
+            "Active Output Pointer: UPDATED (ml.active_output)\n",
+            fg=typer.colors.GREEN,
+            bold=True,
+        )
+        typer.secho("Inventory Status Distribution:", bold=True)
+        total = max(1, result.n_recommendations)
+        for st_name in ["reorder_now", "overstock", "ok", "no_data"]:
+            count = result.status_counts.get(st_name, 0)
+            pct = count / total
+            color = (
+                typer.colors.RED
+                if st_name == "reorder_now"
+                else (
+                    typer.colors.YELLOW
+                    if st_name == "overstock"
+                    else (typer.colors.GREEN if st_name == "ok" else typer.colors.WHITE)
+                )
+            )
+            typer.secho(
+                f"  {st_name.upper():<12} | Count: {count:>5} ({pct:>5.1%})",
+                fg=color,
+            )
+        typer.echo()
+
+
 # =====================================================================
 # Inventory Optimization Subcommands
 # =====================================================================
