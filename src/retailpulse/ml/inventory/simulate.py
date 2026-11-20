@@ -700,9 +700,7 @@ def run_policy_simulation(
                 "n_orders_diff": 0,
             },
         }
-        created_at_dt = datetime.datetime.combine(
-            win_end, datetime.time.min, tzinfo=datetime.UTC
-        )
+        created_at_dt = datetime.datetime.combine(win_end, datetime.time.min, tzinfo=datetime.UTC)
         return SimulationResult(
             simulation_id=uuid.uuid4(),
             forecast_run_id=eff_run_id,
