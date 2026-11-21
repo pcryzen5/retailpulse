@@ -9,9 +9,11 @@ import uuid
 from pathlib import Path
 from typing import Annotated, Any
 
+import sqlalchemy as sa
 import typer
 
 import retailpulse
+from retailpulse.db.models.app import AppUser
 from retailpulse.db.session import check_database, session_scope
 from retailpulse.errors import DatabaseError, IngestionError, RetailPulseError
 from retailpulse.etl.aggregate import AggregationResult, run_aggregation_pipeline
@@ -26,6 +28,9 @@ from retailpulse.ingestion.adapters.generic_csv import GenericCSVAdapter
 from retailpulse.ingestion.adapters.online_retail_ii import OnlineRetailIIAdapter
 from retailpulse.ingestion.loaders import LoadResult, load_sales_dataset
 from retailpulse.logging import configure_logging
+from retailpulse.security.auth import ensure_not_last_admin
+from retailpulse.security.password import hash_password, validate_password
+from retailpulse.timeutil import utc_now
 
 app = typer.Typer(
     name="retailpulse",
@@ -1565,3 +1570,175 @@ def simulate_inventory_command(  # noqa: PLR0917, PLR0915
         if report_generated_path:
             typer.secho(f"\nReport written to: {report_generated_path}", fg=typer.colors.CYAN)
         typer.echo()
+
+
+users_app = typer.Typer(
+    name="users",
+    help="User access and account management commands.",
+    no_args_is_help=True,
+)
+app.add_typer(users_app, name="users")
+
+
+@users_app.command("create")
+def create_user_command(
+    email: Annotated[
+        str,
+        typer.Option("--email", "-e", help="User email address."),
+    ],
+    role: Annotated[
+        str,
+        typer.Option("--role", "-r", help="Role: admin, analyst, or viewer."),
+    ] = "analyst",
+    full_name: Annotated[
+        str | None,
+        typer.Option("--full-name", help="User's full name."),
+    ] = None,
+    password: Annotated[
+        str | None,
+        typer.Option("--password", "-p", help="User password (prompted securely if omitted)."),
+    ] = None,
+) -> None:
+    """Create a new user with Argon2id password hashing (J1 setup)."""
+    clean_email = email.strip().lower()
+    clean_role = role.strip().lower()
+
+    if clean_role not in ("admin", "analyst", "viewer"):
+        typer.secho(
+            f"Error: Invalid role '{role}'. Must be admin, analyst, or viewer.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    if password is None:
+        password = typer.prompt("Password", hide_input=True, confirmation_prompt=True)
+
+    try:
+        validate_password(password)
+    except Exception as exc:
+        typer.secho(f"Password Error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    pwd_hash = hash_password(password, validate=False)
+
+    with session_scope() as session:
+        existing = session.execute(
+            sa.select(AppUser.user_id).where(AppUser.email == clean_email)
+        ).scalar_one_or_none()
+        if existing is not None:
+            typer.secho(
+                f"Error: User with email '{clean_email}' already exists.",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        user = AppUser(
+            user_id=uuid.uuid4(),
+            email=clean_email,
+            full_name=full_name.strip() if full_name else None,
+            role=clean_role,
+            password_hash=pwd_hash,
+            is_active=True,
+        )
+        session.add(user)
+        session.commit()
+
+        typer.secho(
+            f"Successfully created user {clean_email} ({clean_role}) [ID: {user.user_id}]",
+            fg=typer.colors.GREEN,
+        )
+
+
+@users_app.command("list")
+def list_users_command(
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output in JSON format."),
+    ] = False,
+) -> None:
+    """List all registered users."""
+    with session_scope() as session:
+        users = (
+            session.execute(sa.select(AppUser).order_by(AppUser.created_at.asc())).scalars().all()
+        )
+
+        if json_output:
+            data = [
+                {
+                    "user_id": str(u.user_id),
+                    "email": u.email,
+                    "full_name": u.full_name,
+                    "role": u.role,
+                    "is_active": u.is_active,
+                    "failed_login_count": u.failed_login_count,
+                    "locked_until": u.locked_until.isoformat() if u.locked_until else None,
+                    "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+                    "created_at": u.created_at.isoformat() if u.created_at else None,
+                }
+                for u in users
+            ]
+            typer.echo(json.dumps(data, indent=2))
+            return
+
+        if not users:
+            typer.echo("No registered users found.")
+            return
+
+        typer.echo(
+            f"{'Email':<30} {'Role':<10} {'Active':<8} {'Locked':<8} {'Full Name':<25} {'User ID'}"
+        )
+        typer.echo("-" * 110)
+        now_dt = utc_now()
+        for u in users:
+            is_locked = "Yes" if (u.locked_until and u.locked_until > now_dt) else "No"
+            active_str = "Yes" if u.is_active else "No"
+            name_str = (u.full_name or "-")[:24]
+            typer.echo(
+                f"{u.email:<30} {u.role:<10} {active_str:<8} "
+                f"{is_locked:<8} {name_str:<25} {u.user_id}"
+            )
+
+
+@users_app.command("deactivate")
+def deactivate_user_command(
+    identifier: Annotated[
+        str,
+        typer.Argument(help="User email address or UUID to deactivate."),
+    ],
+) -> None:
+    """Deactivate an active user account (with last-admin protection)."""
+    clean_id = identifier.strip().lower()
+
+    with session_scope() as session:
+        user: AppUser | None = None
+        try:
+            target_uuid = uuid.UUID(clean_id)
+            user = session.execute(
+                sa.select(AppUser).where(AppUser.user_id == target_uuid)
+            ).scalar_one_or_none()
+        except ValueError:
+            pass
+
+        if user is None:
+            user = session.execute(
+                sa.select(AppUser).where(AppUser.email == clean_id)
+            ).scalar_one_or_none()
+
+        if user is None:
+            typer.secho(f"Error: User '{identifier}' not found.", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1)
+
+        try:
+            ensure_not_last_admin(session, user, new_is_active=False)
+        except Exception as exc:
+            typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1) from exc
+
+        user.is_active = False
+        session.commit()
+        typer.secho(
+            f"Successfully deactivated user {user.email} ({user.role}) [ID: {user.user_id}]",
+            fg=typer.colors.GREEN,
+        )

@@ -72,9 +72,9 @@ def session_scope(engine: Engine | None = None) -> Generator[Session, None, None
         session.close()
 
 
-def get_db(engine: Engine | None = None) -> Generator[Session, None, None]:
+def get_db(engine: Any = None) -> Generator[Session, None, None]:
     """Yield a database session for request lifecycle (FastAPI dependency)."""
-    factory = get_session_factory(engine)
+    factory = get_session_factory(engine) if engine is not None else get_session_factory()
     session: Session = factory()
     try:
         yield session

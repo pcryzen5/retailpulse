@@ -122,7 +122,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 
 ### Phase 5 — API and auth
 - [x] **P5-01 App factory.** Settings, lifespan, middleware (request ID, security headers, timing), RFC 9457 error handlers, `/health/*`. *Verify:* tests for error shape and headers.
-- [ ] **P5-02 Auth.** Argon2id hashing, JWT (fixed algorithm, `exp`, `iat`, `sub`, `role`), lockout, `/auth/*`, `require_role`, `retailpulse users` CLI. *Verify:* tests for expiry, tampering, wrong algorithm, lockout, generic failure message.
+- [x] **P5-02 Auth.** Argon2id hashing, JWT (fixed algorithm, `exp`, `iat`, `sub`, `role`), lockout, `/auth/*`, `require_role`, `retailpulse users` CLI. *Verify:* tests for expiry, tampering, wrong algorithm, lockout, generic failure message.
 - [ ] **P5-03 Shared helpers.** Pagination, sort whitelist, envelope, `security/csv_safety.py`. *Verify:* unit tests including formula-injection cases.
 - [ ] **P5-04 Reference, KPI and forecast routers.** *Verify:* integration tests against seeded DB; 503 before first scoring.
 - [ ] **P5-05 Customer routers.** Segments, customers, churn summary, export. *Verify:* filters and exports tested; no raw identifiers.
