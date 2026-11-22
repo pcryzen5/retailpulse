@@ -27,6 +27,7 @@ from retailpulse.api.routers.auth import router as auth_router
 from retailpulse.api.routers.customers import router as customers_router
 from retailpulse.api.routers.forecasts import router as forecasts_router
 from retailpulse.api.routers.health import router as health_router
+from retailpulse.api.routers.inventory import router as inventory_router
 from retailpulse.api.routers.kpis import router as kpis_router
 from retailpulse.api.routers.reference import router as reference_router
 from retailpulse.api.routers.users import router as users_router
@@ -116,5 +117,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(kpis_router, prefix="/api/v1")
     app.include_router(forecasts_router, prefix="/api/v1")
     app.include_router(customers_router, prefix="/api/v1")
+    app.include_router(inventory_router, prefix="/api/v1")
 
     return app
