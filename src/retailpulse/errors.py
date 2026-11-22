@@ -52,5 +52,9 @@ class ModelGateError(RetailPulseError):
     """Raised when a candidate model fails the champion gate."""
 
 
+class ServiceUnavailableError(RetailPulseError):
+    """Raised when an active model, forecast, or required service output is unavailable."""
+
+
 class DatabaseError(RetailPulseError):
     """Raised when database operations, connectivity, or migrations fail."""

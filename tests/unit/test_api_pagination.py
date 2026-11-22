@@ -234,4 +234,3 @@ def test_paginate_query_and_apply_sort(sqlite_session) -> None:
     # Next highest: Epsilon (15.0), Alpha (10.0)
     assert items_p2[0].name == "Epsilon"
     assert items_p2[1].name == "Alpha"
-

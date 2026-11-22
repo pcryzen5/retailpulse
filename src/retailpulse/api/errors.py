@@ -30,6 +30,7 @@ from retailpulse.errors import (
     PermissionDeniedError,
     PipelineError,
     RetailPulseError,
+    ServiceUnavailableError,
 )
 from retailpulse.logging import get_logger, request_id_ctx
 
@@ -230,6 +231,11 @@ async def domain_exception_handler(  # noqa: PLR0915
         status_code = 422
         suffix = "validation_error"
         title = "Model Gate Validation Failed"
+        detail = exc.message
+    elif isinstance(exc, ServiceUnavailableError):
+        status_code = 503
+        suffix = "model_unavailable"
+        title = "Service Unavailable"
         detail = exc.message
     elif isinstance(exc, DatabaseError):
         status_code = 503

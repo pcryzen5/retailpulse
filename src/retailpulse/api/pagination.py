@@ -224,4 +224,3 @@ def paginate_query(
     items = list(session.execute(paged_query).scalars().all())
 
     return items, total
-

@@ -24,7 +24,10 @@ from retailpulse.api.middleware import (
     TimingMiddleware,
 )
 from retailpulse.api.routers.auth import router as auth_router
+from retailpulse.api.routers.forecasts import router as forecasts_router
 from retailpulse.api.routers.health import router as health_router
+from retailpulse.api.routers.kpis import router as kpis_router
+from retailpulse.api.routers.reference import router as reference_router
 from retailpulse.api.routers.users import router as users_router
 from retailpulse.config import Settings, get_settings
 from retailpulse.logging import get_logger
@@ -108,5 +111,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router)
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(users_router, prefix="/api/v1")
+    app.include_router(reference_router, prefix="/api/v1")
+    app.include_router(kpis_router, prefix="/api/v1")
+    app.include_router(forecasts_router, prefix="/api/v1")
 
     return app
