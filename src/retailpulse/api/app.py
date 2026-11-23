@@ -16,8 +16,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.middleware import SlowAPIMiddleware
 
 from retailpulse.api.errors import register_error_handlers
+from retailpulse.api.limiter import limiter
+from retailpulse.api.metrics import router as metrics_router
 from retailpulse.api.middleware import (
     RequestIDMiddleware,
     SecurityHeadersMiddleware,
@@ -41,6 +44,63 @@ from retailpulse.logging import get_logger
 from retailpulse.pipelines.trigger import NoopPipelineTrigger
 
 logger = get_logger("retailpulse.api.app")
+
+OPENAPI_TAGS: list[dict[str, str]] = [
+    {
+        "name": "Auth",
+        "description": "User authentication, JWT token issuance, and account credentials.",
+    },
+    {
+        "name": "Users",
+        "description": "User administration, role management, and deactivation (Admin only).",
+    },
+    {
+        "name": "Reference",
+        "description": "Master reference data for stores and products.",
+    },
+    {
+        "name": "KPIs",
+        "description": "Executive revenue, units, margins, and sales summaries.",
+    },
+    {
+        "name": "Forecasts",
+        "description": "Demand forecasts, accuracy metrics, and baseline comparisons.",
+    },
+    {
+        "name": "Customers",
+        "description": "Customer intelligence, RFM segmentation, and churn risk analysis.",
+    },
+    {
+        "name": "Inventory",
+        "description": (
+            "Inventory recommendations, what-if analysis, and Monte Carlo policy simulation."
+        ),
+    },
+    {
+        "name": "Models",
+        "description": "ML model registry, champion promotion, and training dispatch.",
+    },
+    {
+        "name": "Monitoring",
+        "description": "Distribution/prediction drift reports and realized model performance.",
+    },
+    {
+        "name": "Alerts",
+        "description": "Operational, drift, and performance alerts and acknowledgements.",
+    },
+    {
+        "name": "Uploads",
+        "description": "Raw sales file upload, deduplication, and ingestion tracking.",
+    },
+    {
+        "name": "Pipelines",
+        "description": "Workflow orchestration runs and execution triggers.",
+    },
+    {
+        "name": "Health",
+        "description": "Service liveness, readiness, and connectivity diagnostic probes.",
+    },
+]
 
 
 @asynccontextmanager
@@ -85,16 +145,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url=docs_url,
         redoc_url=redoc_url,
         openapi_url=openapi_url,
+        openapi_tags=OPENAPI_TAGS,
         lifespan=lifespan,
     )
 
     app.state.settings = cfg
     app.state.pipeline_trigger = NoopPipelineTrigger()
+    app.state.limiter = limiter
 
     # 1. Register RFC 9457 error handlers
     register_error_handlers(app)
 
     # 2. Add middleware stack (LIFO: RequestID is outermost, then Timing, then SecurityHeaders)
+    app.add_middleware(SlowAPIMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(TimingMiddleware)
     app.add_middleware(RequestIDMiddleware)
@@ -118,6 +181,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # 4. Mount routers
     app.include_router(health_router)
+    app.include_router(metrics_router)
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(users_router, prefix="/api/v1")
     app.include_router(reference_router, prefix="/api/v1")

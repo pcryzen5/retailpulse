@@ -14,11 +14,12 @@ import uuid
 from typing import Annotated, Any
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from retailpulse.api.dependencies import get_current_user, require_role
+from retailpulse.api.limiter import limiter
 from retailpulse.api.pagination import PaginatedResponse, PaginationParams
 from retailpulse.db.models.app import AppUser
 from retailpulse.db.models.ops import PipelineRun
@@ -208,7 +209,9 @@ def get_pipeline_run(
     operation_id="trigger_pipeline_flow",
     summary="Trigger an orchestration pipeline run (RBAC enforced per flow)",
 )
+@limiter.limit("20/hour")
 async def trigger_pipeline(  # noqa: PLR0917
+    request: Request,
     flow_name: str,
     response: Response,
     current_user: Annotated[AppUser, Depends(get_current_user)],
@@ -217,6 +220,7 @@ async def trigger_pipeline(  # noqa: PLR0917
     payload: TriggerPipelineRequest | None = None,
 ) -> TriggerPipelineResponse:
     """Trigger an asynchronous workflow with concurrency gating and flow-specific RBAC."""
+    del request
     clean_flow = flow_name.strip().lower()
     if clean_flow not in ALLOWED_FLOWS:
         raise DomainValidationError(

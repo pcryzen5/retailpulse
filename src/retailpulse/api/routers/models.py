@@ -14,11 +14,12 @@ import uuid
 from typing import Annotated, Any
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from retailpulse.api.dependencies import require_role
+from retailpulse.api.limiter import limiter
 from retailpulse.api.pagination import (
     PaginatedResponse,
     PaginationParams,
@@ -268,7 +269,9 @@ def get_model_run(
     operation_id="dispatch_training_pipeline",
     summary="Trigger model training pipeline (Admin only)",
 )
-def train_model(
+@limiter.limit("20/hour")
+def train_model(  # noqa: PLR0917
+    request: Request,
     task: str,
     payload: TrainModelRequest,
     current_user: Annotated[AppUser, Depends(require_role("admin"))],
@@ -276,6 +279,7 @@ def train_model(
     response: Response,
 ) -> TrainModelResponse:
     """Trigger an asynchronous model training pipeline run."""
+    del request
     task_clean = task.strip().lower()
     if task_clean not in VALID_TASKS:
         raise DomainValidationError(f"Invalid task '{task}'. Allowed tasks: {sorted(VALID_TASKS)}")
@@ -332,12 +336,15 @@ def train_model(
     operation_id="promote_model_champion",
     summary="Promote model run to champion and trigger score_all (Admin only)",
 )
+@limiter.limit("20/hour")
 def promote_model(
+    request: Request,
     run_id: uuid.UUID,
     current_user: Annotated[AppUser, Depends(require_role("admin"))],
     session: Annotated[Session, Depends(get_db)],
 ) -> PromoteModelResponse:
     """Promote a successful, gate-passed model run to champion status."""
+    del request
     model = session.get(ModelRun, run_id)
     if model is None:
         raise NotFoundError(f"Model run {run_id} not found")

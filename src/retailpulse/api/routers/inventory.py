@@ -19,12 +19,13 @@ from decimal import Decimal
 from typing import Annotated, Any
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from starlette.responses import StreamingResponse
 
 from retailpulse.api.dependencies import require_role
+from retailpulse.api.limiter import limiter
 from retailpulse.api.pagination import (
     PaginationParams,
     apply_sort,
@@ -900,12 +901,15 @@ def compute_inventory_what_if(  # noqa: PLR0915
     summary="Run synchronous policy simulation against historical demand",
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit("20/hour")
 def run_simulation(
+    request: Request,
     payload: SimulationRequest,
     current_user: Annotated[AppUser, Depends(require_role("analyst"))],
     session: Annotated[Session, Depends(get_db)],
 ) -> SimulationResponse:
     """Run an inventory policy simulation (max 200 SKUs) and persist results."""
+    del request
     # 1. Enforce max 200 SKUs limit (API §3.8: limit > 200 -> 422)
     if payload.scope.limit > MAX_SIMULATION_LIMIT:
         msg = (

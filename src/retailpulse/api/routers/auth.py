@@ -13,9 +13,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from retailpulse.api.dependencies import get_current_user
+from retailpulse.api.limiter import limiter
 from retailpulse.config import get_settings
 from retailpulse.db.models.app import AppUser
 from retailpulse.db.session import get_db
@@ -62,6 +64,7 @@ class ChangePasswordRequest(BaseModel):
     response_model=TokenResponse,
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit("5/minute", key_func=get_remote_address)
 async def login(
     request: Request,
     session: Annotated[Session, Depends(get_db)],

@@ -19,6 +19,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from retailpulse.api.metrics import record_http_metrics
 from retailpulse.logging import bind_request_id, get_logger, reset_request_id
 
 logger = get_logger("retailpulse.api.http")
@@ -64,9 +65,20 @@ class TimingMiddleware(BaseHTTPMiddleware):
         """Track processing latency and log request details."""
         start_time = time.perf_counter()
         response = await call_next(request)
-        process_time_ms = (time.perf_counter() - start_time) * 1000.0
+        duration_seconds = time.perf_counter() - start_time
+        process_time_ms = duration_seconds * 1000.0
 
         response.headers["X-Process-Time"] = f"{process_time_ms:.2f}ms"
+
+        # Record Prometheus metric
+        route = request.scope.get("route")
+        handler = getattr(route, "path", None) or request.url.path
+        record_http_metrics(
+            method=request.method,
+            handler=handler,
+            status_code=response.status_code,
+            duration_seconds=duration_seconds,
+        )
 
         client_host = request.client.host if request.client else None
         logger.info(

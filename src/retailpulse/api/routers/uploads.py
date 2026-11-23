@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from retailpulse.api.dependencies import require_role
+from retailpulse.api.limiter import limiter
 from retailpulse.api.pagination import PaginatedResponse, PaginationParams
 from retailpulse.config import Settings, get_settings
 from retailpulse.db.models.app import AppUser
@@ -122,7 +123,9 @@ class IngestionBatchDetailResponse(BaseModel):
     operation_id="upload_sales_file",
     summary="Upload sales data file for ingestion (Analyst+)",
 )
+@limiter.limit("10/hour")
 async def upload_sales(  # noqa: PLR0917
+    request: Request,
     response: Response,
     file: Annotated[UploadFile, File(description="CSV or XLSX sales data file")],
     current_user: Annotated[AppUser, Depends(require_role("analyst"))],
@@ -134,6 +137,7 @@ async def upload_sales(  # noqa: PLR0917
     ] = "generic_csv",
 ) -> UploadSalesResponse:
     """Validate, deduplicate, store, and trigger ETL ingestion for a sales file."""
+    del request
     # 1. Stream, calculate SHA-256, verify size limit & magic bytes into temp file
     sha256_hex, temp_path, total_bytes, ext = await stream_and_validate_upload(
         upload_file=file,

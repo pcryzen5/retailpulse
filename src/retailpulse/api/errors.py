@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from retailpulse.errors import (
@@ -313,8 +314,27 @@ async def unhandled_exception_handler(
     )
 
 
+async def rate_limit_exceeded_handler(
+    request: Request,
+    exc: RateLimitExceeded,
+) -> JSONResponse:
+    """Handle SlowAPI RateLimitExceeded and format as RFC 9457 with Retry-After header."""
+    req_id = _resolve_request_id(request)
+    response = create_problem_response(
+        status_code=429,
+        title="Rate Limited",
+        detail=f"Rate limit exceeded: {exc.detail}",
+        instance=request.url.path,
+        request_id=req_id,
+        type_suffix="rate_limited",
+    )
+    response.headers["Retry-After"] = "60"
+    return response
+
+
 def register_error_handlers(app: FastAPI) -> None:
     """Register all RFC 9457 exception handlers on the FastAPI application."""
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)  # type: ignore[arg-type]
     app.add_exception_handler(StarletteHTTPException, starlette_http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(RequestValidationError, request_validation_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(RetailPulseError, domain_exception_handler)  # type: ignore[arg-type]
