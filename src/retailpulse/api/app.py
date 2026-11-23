@@ -32,10 +32,13 @@ from retailpulse.api.routers.inventory import router as inventory_router
 from retailpulse.api.routers.kpis import router as kpis_router
 from retailpulse.api.routers.models import router as models_router
 from retailpulse.api.routers.monitoring import router as monitoring_router
+from retailpulse.api.routers.pipelines import router as pipelines_router
 from retailpulse.api.routers.reference import router as reference_router
+from retailpulse.api.routers.uploads import router as uploads_router
 from retailpulse.api.routers.users import router as users_router
 from retailpulse.config import Settings, get_settings
 from retailpulse.logging import get_logger
+from retailpulse.pipelines.trigger import NoopPipelineTrigger
 
 logger = get_logger("retailpulse.api.app")
 
@@ -86,6 +89,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.state.settings = cfg
+    app.state.pipeline_trigger = NoopPipelineTrigger()
 
     # 1. Register RFC 9457 error handlers
     register_error_handlers(app)
@@ -124,5 +128,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(models_router, prefix="/api/v1")
     app.include_router(monitoring_router, prefix="/api/v1")
     app.include_router(alerts_router, prefix="/api/v1")
+    app.include_router(uploads_router, prefix="/api/v1")
+    app.include_router(pipelines_router, prefix="/api/v1")
 
     return app
