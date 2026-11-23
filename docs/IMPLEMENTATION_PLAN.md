@@ -130,7 +130,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P5-07 Models, monitoring and alerts routers.** Reads now; promote and train call services (full flows in Phase 7). *Verify:* RBAC tests.
 - [x] **P5-08 Uploads and pipelines routers.** Upload validation (size, type, magic bytes, headers), `PipelineTrigger` abstraction with Noop and Inline implementations. *Verify:* duplicate-file and 409 tests.
 - [x] **P5-09 Rate limiting, metrics, docs toggle.** slowapi limits, `/metrics`, OpenAPI tags and examples, `RP_ENABLE_DOCS`. *Verify:* 429 test; docs disabled in prod config test.
-- [ ] **P5-10 API test suite.** RBAC matrix (every endpoint × role), pagination bounds, error shapes, sensitive-field scan. *Verify:* `pytest tests/integration/api` and `api/` coverage ≥ 85%.
+- [x] **P5-10 API test suite.** RBAC matrix (every endpoint × role), pagination bounds, error shapes, sensitive-field scan. *Verify:* `pytest tests/integration/api` and `api/` coverage ≥ 85%.
 
 ### Phase 6 — Dashboard
 - [ ] **P6-01 Scaffold.** `.streamlit/config.toml`, `theme.py` (palette, `style_figure`), `client.py` (timeouts, retries, problem mapping), login and session state, role-based `st.navigation`, status strip. *Verify:* AppTest: login success and failure; viewer sees no Admin page.

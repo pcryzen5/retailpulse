@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import datetime
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, status
@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from retailpulse.api.dependencies import require_role
+from retailpulse.api.pagination import apply_sort, parse_sort
 from retailpulse.db.models.app import AppUser
 from retailpulse.db.session import get_db
 from retailpulse.errors import ConflictError, DomainValidationError, NotFoundError
@@ -28,6 +29,12 @@ from retailpulse.security.password import hash_password, validate_password
 router = APIRouter(prefix="/users", tags=["Users"])
 
 VALID_ROLES = frozenset({"admin", "analyst", "viewer"})
+
+USER_SORT_WHITELIST: dict[str, Any] = {
+    "created_at": AppUser.created_at,
+    "email": AppUser.email,
+    "role": AppUser.role,
+}
 
 
 class UserDetailResponse(BaseModel):
@@ -90,18 +97,25 @@ async def list_users(
     session: Annotated[Session, Depends(get_db)],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     page_size: Annotated[int, Query(ge=1, le=200, description="Items per page")] = 50,
+    sort: Annotated[
+        str,
+        Query(
+            description=(
+                "Sort expression (allowed: created_at, email, role). Default: created_at:desc"
+            )
+        ),
+    ] = "created_at:desc",
 ) -> UserListEnvelope:
     """Return paginated list of all users (Admin only)."""
+    sort_fields = parse_sort(
+        sort, allowed_fields=USER_SORT_WHITELIST.keys(), default="created_at:desc"
+    )
     offset = (page - 1) * page_size
     total = session.scalar(sa.select(sa.func.count(AppUser.user_id))) or 0
 
-    users = (
-        session.execute(
-            sa.select(AppUser).order_by(AppUser.created_at.desc()).offset(offset).limit(page_size)
-        )
-        .scalars()
-        .all()
-    )
+    query = sa.select(AppUser)
+    query = apply_sort(query, sort_fields, USER_SORT_WHITELIST)
+    users = session.execute(query.offset(offset).limit(page_size)).scalars().all()
 
     items = [
         UserDetailResponse(

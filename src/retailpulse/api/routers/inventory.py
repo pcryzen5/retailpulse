@@ -453,6 +453,12 @@ def get_inventory_recommendations(  # noqa: PLR0917
     ] = "stockout_risk:desc",
 ) -> PaginatedInventoryRecommendationsResponse:
     """Retrieve paginated and filtered inventory recommendations."""
+    sort_fields = parse_sort(
+        sort,
+        allowed_fields=RECOMMENDATION_SORT_WHITELIST.keys(),
+        default="stockout_risk:desc",
+    )
+
     active_inv = _get_active_inventory_output(session)
     if active_inv is None:
         synthetic_share = _calculate_params_synthetic_share(session, None)
@@ -492,11 +498,6 @@ def get_inventory_recommendations(  # noqa: PLR0917
     total = session.scalar(count_stmt) or 0
 
     # 3. Apply sorting and pagination
-    sort_fields = parse_sort(
-        sort,
-        allowed_fields=RECOMMENDATION_SORT_WHITELIST.keys(),
-        default="stockout_risk:desc",
-    )
     query = apply_sort(query, sort_fields, RECOMMENDATION_SORT_WHITELIST)
     offset = (pagination.page - 1) * pagination.page_size
     query = query.offset(offset).limit(pagination.page_size)

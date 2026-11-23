@@ -103,6 +103,7 @@ class PipelineRun(Base):
             "flow_name",
             unique=True,
             postgresql_where=text("status IN ('queued', 'running')"),
+            sqlite_where=text("status IN ('queued', 'running')"),
         ),
         Index("ix_pipeline_run_flow_time", "flow_name", text("queued_at DESC")),
         {"schema": "ops"},

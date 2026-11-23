@@ -66,4 +66,3 @@ def get_metrics() -> Response:
         content=generate_latest(),
         media_type=CONTENT_TYPE_LATEST,
     )
-

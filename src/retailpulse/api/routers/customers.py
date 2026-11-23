@@ -201,7 +201,7 @@ def _build_customers_query(
         CustomerSegment.monetary,
         ChurnScore.churn_probability,
         ChurnScore.risk_band,
-    )
+    ).select_from(DimCustomer)
 
     # Left join active segmentation
     if active_seg is not None:

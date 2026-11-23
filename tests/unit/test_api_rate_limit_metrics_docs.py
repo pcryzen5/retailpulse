@@ -89,6 +89,7 @@ def test_rate_limit_login_exceeded_429(ops_db_session: Session, seeded_user: dic
     app = create_app(settings=settings)
     app.dependency_overrides[get_db] = lambda: ops_db_session
     if hasattr(app.state, "limiter"):
+        app.state.limiter.enabled = True
         app.state.limiter.reset()
     client = TestClient(app)
 
@@ -224,4 +225,3 @@ def test_docs_enabled_in_dev_by_default():
 
     assert client.get("/docs").status_code == 200
     assert client.get("/openapi.json").status_code == 200
-
