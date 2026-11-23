@@ -24,11 +24,21 @@ from retailpulse.db.models.ml import (
     PolicySimulation,
     SegmentProfile,
 )
-from retailpulse.db.models.ops import DataQualityResult, IngestionBatch, PipelineRun
+from retailpulse.db.models.ops import (
+    Alert,
+    AuditLog,
+    DataQualityResult,
+    DriftReport,
+    IngestionBatch,
+    ModelPerformance,
+    PipelineRun,
+)
 
 __all__ = [
     "ActiveOutput",
+    "Alert",
     "AppUser",
+    "AuditLog",
     "ChurnScore",
     "CustomerSegment",
     "DataQualityResult",
@@ -36,6 +46,7 @@ __all__ = [
     "DimDate",
     "DimProduct",
     "DimStore",
+    "DriftReport",
     "FactDailySales",
     "FactSalesLine",
     "Forecast",
@@ -44,6 +55,7 @@ __all__ = [
     "InventoryParam",
     "InventoryRecommendation",
     "InventorySnapshot",
+    "ModelPerformance",
     "ModelRun",
     "PipelineRun",
     "PolicySimulation",

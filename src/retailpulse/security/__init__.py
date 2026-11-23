@@ -1,5 +1,6 @@
 """Security, authentication, and authorization utilities."""
 
+from retailpulse.security.audit import log_audit, sanitize_audit_details
 from retailpulse.security.auth import (
     authenticate_user,
     change_user_password,
@@ -33,9 +34,11 @@ __all__ = [
     "ensure_not_last_admin",
     "format_csv",
     "hash_password",
+    "log_audit",
     "mask_customer_key",
     "pseudonymize_customer_id",
     "pseudonymize_series",
+    "sanitize_audit_details",
     "sanitize_csv_cell",
     "sanitize_csv_row",
     "validate_password",

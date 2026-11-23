@@ -42,6 +42,7 @@ from retailpulse.db.session import get_db
 from retailpulse.errors import DomainValidationError, NotFoundError
 from retailpulse.ml.inventory.policy import evaluate_inventory_policy
 from retailpulse.ml.inventory.simulate import SimulationConfig, run_policy_simulation
+from retailpulse.security.audit import log_audit
 from retailpulse.security.csv_safety import create_csv_streaming_response
 from retailpulse.timeutil import utc_now
 
@@ -711,6 +712,18 @@ def update_inventory_params(
         param.source = "user"
         param.updated_by = current_user.user_id
         param.updated_at = now
+
+    log_audit(
+        session=session,
+        action="param_update",
+        user_id=current_user.user_id,
+        resource=f"inventory_param:{product_id}:{store_id}",
+        details={
+            "lead_time_days": float(payload.lead_time_days),
+            "service_level": float(payload.service_level),
+            "source": "user",
+        },
+    )
 
     session.commit()
     session.refresh(param)

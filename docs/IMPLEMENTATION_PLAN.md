@@ -127,7 +127,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P5-04 Reference, KPI and forecast routers.** *Verify:* integration tests against seeded DB; 503 before first scoring.
 - [x] **P5-05 Customer routers.** Segments, customers, churn summary, export. *Verify:* filters and exports tested; no raw identifiers.
 - [x] **P5-06 Inventory router.** Params, what-if, simulate (limit 200), recommendations, exports. *Verify:* what-if never persists (test).
-- [ ] **P5-07 Models, monitoring and alerts routers.** Reads now; promote and train call services (full flows in Phase 7). *Verify:* RBAC tests.
+- [x] **P5-07 Models, monitoring and alerts routers.** Reads now; promote and train call services (full flows in Phase 7). *Verify:* RBAC tests.
 - [ ] **P5-08 Uploads and pipelines routers.** Upload validation (size, type, magic bytes, headers), `PipelineTrigger` abstraction with Noop and Inline implementations. *Verify:* duplicate-file and 409 tests.
 - [ ] **P5-09 Rate limiting, metrics, docs toggle.** slowapi limits, `/metrics`, OpenAPI tags and examples, `RP_ENABLE_DOCS`. *Verify:* 429 test; docs disabled in prod config test.
 - [ ] **P5-10 API test suite.** RBAC matrix (every endpoint × role), pagination bounds, error shapes, sensitive-field scan. *Verify:* `pytest tests/integration/api` and `api/` coverage ≥ 85%.

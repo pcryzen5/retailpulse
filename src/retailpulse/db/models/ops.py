@@ -4,24 +4,29 @@ from __future__ import annotations
 
 import datetime
 import uuid
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
     CHAR,
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
+    Float,
     ForeignKey,
     Identity,
     Index,
     Integer,
+    Numeric,
     String,
     UniqueConstraint,
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from retailpulse.db.base import Base
@@ -171,3 +176,168 @@ class DataQualityResult(Base):
     )
 
     batch: Mapped[IngestionBatch] = relationship("IngestionBatch", back_populates="quality_results")
+
+
+class DriftReport(Base):
+    """Evidently data and prediction drift reports stored in ops.drift_report."""
+
+    __tablename__ = "drift_report"
+    __table_args__ = (
+        CheckConstraint(
+            "task IN ('forecast', 'segmentation', 'churn')",
+            name="ck_drift_report_task",
+        ),
+        CheckConstraint(
+            "kind IN ('data', 'prediction')",
+            name="ck_drift_report_kind",
+        ),
+        {"schema": "ops"},
+    )
+
+    report_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    task: Mapped[str] = mapped_column(String, nullable=False)
+    model_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ml.model_run.run_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    reference_start: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    reference_end: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    current_start: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    current_end: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    dataset_drift: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    share_drifted_features: Mapped[Decimal | None] = mapped_column(Numeric(5, 4), nullable=True)
+    summary: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        server_default=text("'{}'"),
+        nullable=False,
+    )
+    report_path: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ModelPerformance(Base):
+    """Realized error and performance snapshots in ops.model_performance."""
+
+    __tablename__ = "model_performance"
+    __table_args__ = (
+        UniqueConstraint(
+            "model_run_id",
+            "metric",
+            "window_start",
+            "window_end",
+            name="uq_model_perf_tuple",
+        ),
+        {"schema": "ops"},
+    )
+
+    snapshot_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        Identity(always=True),
+        primary_key=True,
+        autoincrement=True,
+    )
+    model_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ml.model_run.run_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    task: Mapped[str] = mapped_column(String, nullable=False)
+    window_start: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    window_end: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    metric: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    baseline_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    n_observations: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class Alert(Base):
+    """System, pipeline, model, and inventory alerts in ops.alert."""
+
+    __tablename__ = "alert"
+    __table_args__ = (
+        CheckConstraint(
+            "severity IN ('info', 'warning', 'critical')",
+            name="ck_alert_severity",
+        ),
+        Index(
+            "ix_alert_open",
+            text("created_at DESC"),
+            postgresql_where=text("acknowledged_at IS NULL"),
+        ),
+        {"schema": "ops"},
+    )
+
+    alert_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        Identity(always=True),
+        primary_key=True,
+        autoincrement=True,
+    )
+    severity: Mapped[str] = mapped_column(String, nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    message: Mapped[str] = mapped_column(String, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        server_default=text("'{}'"),
+        nullable=False,
+    )
+    dedupe_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    acknowledged_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    acknowledged_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("app.app_user.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+
+class AuditLog(Base):
+    """Append-only audit trail in ops.audit_log (SEC-LOG-01)."""
+
+    __tablename__ = "audit_log"
+    __table_args__ = (
+        Index("ix_audit_ts", text("ts DESC")),
+        Index("ix_audit_user", "user_id", text("ts DESC")),
+        {"schema": "ops"},
+    )
+
+    audit_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        Identity(always=True),
+        primary_key=True,
+        autoincrement=True,
+    )
+    ts: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("app.app_user.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    resource: Mapped[str | None] = mapped_column(String, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(
+        String().with_variant(INET(), "postgresql"), nullable=True
+    )
+    details: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        server_default=text("'{}'"),
+        nullable=False,
+    )
