@@ -465,6 +465,64 @@ class ApiClient:
         data = self.get("/api/v1/segments")
         return cast(list[dict[str, Any]], data or [])
 
+    def get_churn_summary(self) -> dict[str, Any]:
+        """Fetch aggregate churn population metrics and probability histogram."""
+        data = self.get("/api/v1/churn/summary")
+        return cast(dict[str, Any], data or {})
+
+    def get_customers(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 25,
+        segment_id: int | None = None,
+        risk_band: str | None = None,
+        min_probability: float | None = None,
+        q: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str = "desc",
+    ) -> dict[str, Any]:
+        """Fetch paginated list of customers with churn scores and RFM profiles."""
+        params: dict[str, Any] = {"page": page, "page_size": page_size, "sort_dir": sort_dir}
+        if segment_id is not None:
+            params["segment_id"] = segment_id
+        if risk_band and risk_band.lower() != "all":
+            params["risk_band"] = risk_band.lower()
+        if min_probability is not None:
+            params["min_probability"] = min_probability
+        if q:
+            params["q"] = q
+        if sort_by:
+            params["sort_by"] = sort_by
+        data = self.get("/api/v1/customers", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def get_customer_detail(self, customer_id: int) -> dict[str, Any]:
+        """Fetch detailed customer profile, RFM history, and SHAP churn drivers."""
+        data = self.get(f"/api/v1/customers/{customer_id}")
+        return cast(dict[str, Any], data or {})
+
+    def export_customers_csv(
+        self,
+        *,
+        segment_id: int | None = None,
+        risk_band: str | None = None,
+        min_probability: float | None = None,
+        q: str | None = None,
+    ) -> bytes:
+        """Export filtered customer churn records as CSV (Analyst+ only)."""
+        params: dict[str, Any] = {}
+        if segment_id is not None:
+            params["segment_id"] = segment_id
+        if risk_band and risk_band.lower() != "all":
+            params["risk_band"] = risk_band.lower()
+        if min_probability is not None:
+            params["min_probability"] = min_probability
+        if q:
+            params["q"] = q
+        response = self.request("GET", "/api/v1/customers/export", params=params)
+        return response.content
+
     def get_alerts(
         self,
         status: str = "open",
