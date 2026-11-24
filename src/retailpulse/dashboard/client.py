@@ -421,6 +421,29 @@ class ApiClient:
         data = self.get("/api/v1/forecasts", params=params)
         return cast(dict[str, Any], data or {})
 
+    def get_stores(self) -> list[dict[str, Any]]:
+        """Fetch list of all retail stores."""
+        data = self.get("/api/v1/stores")
+        return cast(list[dict[str, Any]], data or [])
+
+    def search_products(
+        self,
+        q: str | None = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        """Search products by SKU or description query."""
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
+        if q:
+            params["q"] = q
+        data = self.get("/api/v1/products", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def get_forecast_accuracy(self) -> dict[str, Any]:
+        """Fetch champion forecast accuracy breakdown by ABC class and horizon bucket."""
+        data = self.get("/api/v1/forecasts/accuracy")
+        return cast(dict[str, Any], data or {})
+
     def get_inventory_recommendations(
         self,
         status: str | None = None,

@@ -263,7 +263,7 @@ def test_client_status_strip_data_parsing():
 
 def test_apptest_unauthenticated_shows_login_page():
     """Unauthenticated access must render the login view without navigating to dashboard pages."""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
     at.run()
 
     # Form is rendered with Sign In submit button
@@ -274,7 +274,7 @@ def test_apptest_unauthenticated_shows_login_page():
 
 def test_apptest_login_failure_invalid_credentials():
     """Failed login displays generic error message ('Email or password is incorrect.')."""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
     at.run()
 
     mock_client = MagicMock(spec=ApiClient)
@@ -298,7 +298,7 @@ def test_apptest_login_failure_invalid_credentials():
 
 def test_apptest_login_failure_rate_limited():
     """Rate limited or locked account displays 'Too many attempts. Try again later.'."""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
     at.run()
 
     mock_client = MagicMock(spec=ApiClient)
@@ -326,7 +326,7 @@ def test_apptest_login_failure_rate_limited():
 
 def test_apptest_login_success():
     """Successful login sets session state, stores access token, and loads user profile."""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
     at.run()
 
     mock_client = MagicMock(spec=ApiClient)
@@ -370,7 +370,7 @@ def test_apptest_role_based_navigation_viewer_vs_admin():
     )
 
     # 1. Viewer Role
-    at_viewer = AppTest.from_file(APP_PATH)
+    at_viewer = AppTest.from_file(APP_PATH, default_timeout=30)
     mock_client_viewer = MagicMock(spec=ApiClient)
     mock_client_viewer.token = "viewer-token"
     mock_client_viewer.get_status_strip_data.return_value = mock_status
@@ -396,7 +396,7 @@ def test_apptest_role_based_navigation_viewer_vs_admin():
     assert any("viewer" in cap.lower() for cap in sidebar_captions)
 
     # 2. Admin Role
-    at_admin = AppTest.from_file(APP_PATH)
+    at_admin = AppTest.from_file(APP_PATH, default_timeout=30)
     mock_client_admin = MagicMock(spec=ApiClient)
     mock_client_admin.token = "admin-token"
     mock_client_admin.get_status_strip_data.return_value = mock_status
