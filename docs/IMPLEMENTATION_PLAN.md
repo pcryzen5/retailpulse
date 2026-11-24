@@ -133,7 +133,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P5-10 API test suite.** RBAC matrix (every endpoint × role), pagination bounds, error shapes, sensitive-field scan. *Verify:* `pytest tests/integration/api` and `api/` coverage ≥ 85%.
 
 ### Phase 6 — Dashboard
-- [ ] **P6-01 Scaffold.** `.streamlit/config.toml`, `theme.py` (palette, `style_figure`), `client.py` (timeouts, retries, problem mapping), login and session state, role-based `st.navigation`, status strip. *Verify:* AppTest: login success and failure; viewer sees no Admin page.
+- [x] **P6-01 Scaffold.** `.streamlit/config.toml`, `theme.py` (palette, `style_figure`), `client.py` (timeouts, retries, problem mapping), login and session state, role-based `st.navigation`, status strip. *Verify:* AppTest: login success and failure; viewer sees no Admin page.
 - [ ] **P6-02 Components.** KPI card, badges, server-paged table, loading/empty/error helpers, confirm dialog, chart helpers. *Verify:* component tests.
 - [ ] **P6-03 Overview.** *Verify:* AppTest with stub client.
 - [ ] **P6-04 Demand Forecast.** *Verify:* AppTest; ineligible SKU shows the reason.
