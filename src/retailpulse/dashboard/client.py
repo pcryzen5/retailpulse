@@ -107,8 +107,8 @@ class UserProfile:
 
     user_id: str
     email: str
-    full_name: str | None
     role: str
+    full_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -332,8 +332,8 @@ class ApiClient:
         return UserProfile(
             user_id=str(data["user_id"]),
             email=data["email"],
-            full_name=data.get("full_name"),
             role=data["role"],
+            full_name=data.get("full_name"),
         )
 
     def get_status_strip_data(self) -> StatusStripData:
@@ -386,6 +386,77 @@ class ApiClient:
             is_stale_warning=is_stale,
             stale_reason=stale_reason,
         )
+
+    # --- Domain Endpoint Helpers ---
+
+    def get_kpis_overview(self) -> dict[str, Any]:
+        """Fetch executive high-level KPIs overview."""
+        data = self.get("/api/v1/kpis/overview")
+        return cast(dict[str, Any], data or {})
+
+    def get_daily_sales(
+        self,
+        product_id: int | None = None,
+        store_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Fetch historical daily sales records."""
+        params: dict[str, Any] = {}
+        if product_id is not None:
+            params["product_id"] = product_id
+        if store_id is not None:
+            params["store_id"] = store_id
+        data = self.get("/api/v1/sales/daily", params=params)
+        return cast(list[dict[str, Any]], data or [])
+
+    def get_forecast(
+        self,
+        product_id: int,
+        store_id: int | None = None,
+        horizon: int = 28,
+    ) -> dict[str, Any]:
+        """Fetch point and interval forecast for a specific product."""
+        params: dict[str, Any] = {"product_id": product_id, "horizon": horizon}
+        if store_id is not None:
+            params["store_id"] = store_id
+        data = self.get("/api/v1/forecasts", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def get_inventory_recommendations(
+        self,
+        status: str | None = None,
+        page: int = 1,
+        page_size: int = 50,
+        sort_by: str | None = None,
+    ) -> dict[str, Any]:
+        """Fetch paginated inventory replenishment recommendations."""
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
+        if status:
+            params["status"] = status
+        if sort_by:
+            params["sort_by"] = sort_by
+        data = self.get("/api/v1/inventory/recommendations", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def get_segments(self) -> list[dict[str, Any]]:
+        """Fetch customer segments profiles."""
+        data = self.get("/api/v1/segments")
+        return cast(list[dict[str, Any]], data or [])
+
+    def get_alerts(
+        self,
+        status: str = "open",
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict[str, Any]:
+        """Fetch operational alerts."""
+        params: dict[str, Any] = {"status": status, "page": page, "page_size": page_size}
+        data = self.get("/api/v1/alerts", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def acknowledge_alert(self, alert_id: int) -> dict[str, Any]:
+        """Acknowledge an operational alert (Analyst+ only)."""
+        data = self.post(f"/api/v1/alerts/{alert_id}/ack")
+        return cast(dict[str, Any], data or {})
 
     def close(self) -> None:
         """Close underlying HTTP transport connections."""

@@ -53,14 +53,16 @@ def set_api_client(client: ApiClient) -> None:
 def get_current_user() -> UserProfile | None:
     """Return currently authenticated UserProfile, or None if unauthenticated."""
     init_session_state()
-    user_dict = st.session_state.get("user")
-    if not user_dict or not st.session_state.get("logged_in"):
+    user_val = st.session_state.get("user")
+    if not user_val or not st.session_state.get("logged_in"):
         return None
+    if isinstance(user_val, UserProfile):
+        return user_val
     return UserProfile(
-        user_id=str(user_dict["user_id"]),
-        email=str(user_dict["email"]),
-        full_name=user_dict.get("full_name"),
-        role=str(user_dict["role"]),
+        user_id=str(user_val["user_id"]),
+        email=str(user_val["email"]),
+        role=str(user_val["role"]),
+        full_name=user_val.get("full_name"),
     )
 
 
