@@ -57,7 +57,7 @@ services:
       - retailpulse_net
 
   prefect:
-    image: prefecthq/prefect:2.19.0-python3.11
+    image: prefecthq/prefect:3-python3.11
     container_name: retailpulse_prefect
     restart: unless-stopped
     depends_on:
@@ -76,6 +76,60 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks:
+      - retailpulse_net
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/worker.Dockerfile
+    container_name: retailpulse_worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+      prefect:
+        condition: service_healthy
+    environment:
+      RP_ENV: dev
+      RP_DATABASE_URL: postgresql+psycopg://rp_app:devpassword@postgres:5432/retailpulse
+      DATABASE_URL: postgresql+psycopg://rp_app:devpassword@postgres:5432/retailpulse
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      RP_MLFLOW_TRACKING_URI: http://mlflow:5000
+      PREFECT_API_URL: http://prefect:4200/api
+      RP_PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_HOME: /tmp/.prefect
+    volumes:
+      - ./data:/app/data
+    networks:
+      - retailpulse_net
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: retailpulse_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      prefect:
+        condition: service_healthy
+    environment:
+      RP_ENV: dev
+      RP_DATABASE_URL: postgresql+psycopg://rp_app:devpassword@postgres:5432/retailpulse
+      DATABASE_URL: postgresql+psycopg://rp_app:devpassword@postgres:5432/retailpulse
+      PREFECT_API_URL: http://prefect:4200/api
+      RP_PREFECT_API_URL: http://prefect:4200/api
+      RP_PIPELINE_TRIGGER: prefect
+      RP_ENABLE_DOCS: "true"
+      PREFECT_HOME: /tmp/.prefect
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
     networks:
       - retailpulse_net
 

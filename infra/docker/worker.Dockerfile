@@ -60,4 +60,4 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import retailpulse; print(retailpulse.__version__)"
 
-CMD ["retailpulse", "--help"]
+CMD ["retailpulse", "worker"]

@@ -1742,3 +1742,11 @@ def deactivate_user_command(
             f"Successfully deactivated user {user.email} ({user.role}) [ID: {user.user_id}]",
             fg=typer.colors.GREEN,
         )
+
+
+@app.command("worker")
+def run_worker() -> None:
+    """Start Prefect deployment worker serving scheduled and triggered flows."""
+    from retailpulse.pipelines.worker import serve_worker  # noqa: PLC0415
+
+    serve_worker()

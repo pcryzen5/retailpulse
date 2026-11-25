@@ -41,7 +41,12 @@ from retailpulse.api.routers.uploads import router as uploads_router
 from retailpulse.api.routers.users import router as users_router
 from retailpulse.config import Settings, get_settings
 from retailpulse.logging import get_logger
-from retailpulse.pipelines.trigger import NoopPipelineTrigger
+from retailpulse.pipelines.trigger import (
+    InlinePipelineTrigger,
+    NoopPipelineTrigger,
+    PipelineTrigger,
+    PrefectTrigger,
+)
 
 logger = get_logger("retailpulse.api.app")
 
@@ -120,11 +125,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Application shutdown")
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    pipeline_trigger: PipelineTrigger | None = None,
+) -> FastAPI:
     """Construct and configure the RetailPulse FastAPI application instance.
 
     Args:
         settings: Optional custom Settings instance; defaults to environment-loaded settings.
+        pipeline_trigger: Optional custom PipelineTrigger; defaults to Settings.pipeline_trigger.
 
     Returns:
         Configured FastAPI application with middleware, routes, and error handlers.
@@ -150,7 +159,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.state.settings = cfg
-    app.state.pipeline_trigger = NoopPipelineTrigger()
+    if pipeline_trigger is not None:
+        app.state.pipeline_trigger = pipeline_trigger
+    elif cfg.pipeline_trigger == "prefect":
+        app.state.pipeline_trigger = PrefectTrigger(api_url=cfg.prefect_api_url)
+    elif cfg.pipeline_trigger == "inline":
+        app.state.pipeline_trigger = InlinePipelineTrigger()
+    else:
+        app.state.pipeline_trigger = NoopPipelineTrigger()
+
     app.state.limiter = limiter
 
     # 1. Register RFC 9457 error handlers

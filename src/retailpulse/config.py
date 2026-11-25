@@ -46,6 +46,10 @@ class Settings(BaseSettings):
         default="http://prefect:4200/api",
         description="Prefect API endpoint",
     )
+    pipeline_trigger: Literal["noop", "inline", "prefect"] = Field(
+        default="noop",
+        description="Pipeline trigger execution adapter ('noop', 'inline', 'prefect')",
+    )
     jwt_secret: SecretStr = Field(
         default=SecretStr("insecure-dev-jwt-secret-min-32-bytes-long!"),
         description="Secret key for signing access tokens",

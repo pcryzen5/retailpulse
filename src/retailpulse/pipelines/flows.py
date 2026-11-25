@@ -366,13 +366,27 @@ FLOW_DISPATCH_TABLE: dict[str, Callable[[uuid.UUID, dict[str, Any]], dict[str, A
 @flow(name="retailpulse-pipeline-flow", log_prints=True)
 def execute_pipeline_flow(
     flow_name: str,
-    run_id: str | uuid.UUID,
+    run_id: str | uuid.UUID | None = None,
     params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Main Prefect entrypoint executing the requested workflow with full bookkeeping."""
-    parsed_run_id = uuid.UUID(str(run_id))
     p = params or {}
     clean_flow = flow_name.strip().lower()
+
+    if run_id is None:
+        parsed_run_id = uuid.uuid4()
+        with session_scope() as session:
+            new_run = PipelineRun(
+                run_id=parsed_run_id,
+                flow_name=clean_flow,
+                trigger="schedule",
+                status="queued",
+                params=p,
+            )
+            session.add(new_run)
+            session.commit()
+    else:
+        parsed_run_id = uuid.UUID(str(run_id))
 
     if clean_flow not in FLOW_DISPATCH_TABLE:
         err = f"Unknown workflow flow_name: '{clean_flow}'"
@@ -421,7 +435,7 @@ def execute_pipeline_flow(
 # Flow aliases for direct Prefect deployment serving
 @flow(name="etl", log_prints=True)
 def etl_flow(
-    run_id: str | uuid.UUID,
+    run_id: str | uuid.UUID | None = None,
     params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Prefect deployment flow for sales ETL ingestion."""
@@ -430,7 +444,7 @@ def etl_flow(
 
 @flow(name="score_all", log_prints=True)
 def score_all_flow(
-    run_id: str | uuid.UUID,
+    run_id: str | uuid.UUID | None = None,
     params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Prefect deployment flow for end-to-end model scoring."""
@@ -439,7 +453,7 @@ def score_all_flow(
 
 @flow(name="train_forecast", log_prints=True)
 def train_forecast_flow(
-    run_id: str | uuid.UUID,
+    run_id: str | uuid.UUID | None = None,
     params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Prefect deployment flow for demand forecast model training."""
@@ -448,7 +462,7 @@ def train_forecast_flow(
 
 @flow(name="train_segmentation", log_prints=True)
 def train_segmentation_flow(
-    run_id: str | uuid.UUID,
+    run_id: str | uuid.UUID | None = None,
     params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Prefect deployment flow for customer segmentation training."""
@@ -457,7 +471,7 @@ def train_segmentation_flow(
 
 @flow(name="train_churn", log_prints=True)
 def train_churn_flow(
-    run_id: str | uuid.UUID,
+    run_id: str | uuid.UUID | None = None,
     params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Prefect deployment flow for customer churn model training."""
@@ -466,7 +480,7 @@ def train_churn_flow(
 
 @flow(name="drift_check", log_prints=True)
 def drift_check_flow(
-    run_id: str | uuid.UUID,
+    run_id: str | uuid.UUID | None = None,
     params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Prefect deployment flow for feature & prediction drift checking."""
