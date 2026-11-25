@@ -142,7 +142,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P6-07 Inventory.** Table, what-if, save with confirmation, simulation, export, synthetic notice. *Verify:* AppTest; notice present when `params_source = synthetic`.
 - [x] **P6-08 Monitoring.** Models, performance, drift, alerts; admin-only actions. *Verify:* AppTest per role.
 - [x] **P6-09 Data and Pipelines.** Upload, status polling, triggers. *Verify:* AppTest with stub upload.
-- [ ] **P6-10 Admin Users.** *Verify:* AppTest; last-admin protection message.
+- [x] **P6-10 Admin Users.** *Verify:* AppTest; last-admin protection message.
 - [ ] **P6-11 Polish.** Accessibility checklist (DESIGN §8), screenshots for README. *Verify:* checklist ticked in the PR.
 
 ### Phase 7 — MLOps and orchestration

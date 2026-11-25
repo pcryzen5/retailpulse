@@ -754,6 +754,56 @@ class ApiClient:
         data = self.post(f"/api/v1/pipelines/{flow_name}/trigger", json=payload)
         return cast(dict[str, Any], data or {})
 
+    def get_users(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+        sort: str = "created_at:desc",
+    ) -> dict[str, Any]:
+        """Fetch paginated list of system users (Admin only)."""
+        params: dict[str, Any] = {"page": page, "page_size": page_size, "sort": sort}
+        data = self.get("/api/v1/users", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def create_user(
+        self,
+        email: str,
+        password: str,
+        role: str = "analyst",
+        full_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a new user account with validated role and password (Admin only)."""
+        payload: dict[str, Any] = {
+            "email": email,
+            "password": password,
+            "role": role,
+            "full_name": full_name,
+        }
+        data = self.post("/api/v1/users", json=payload)
+        return cast(dict[str, Any], data or {})
+
+    def update_user(
+        self,
+        user_id: str,
+        *,
+        role: str | None = None,
+        is_active: bool | None = None,
+        full_name: str | None = None,
+        password: str | None = None,
+    ) -> dict[str, Any]:
+        """Update user role, status, full name or password (Admin only)."""
+        payload: dict[str, Any] = {}
+        if role is not None:
+            payload["role"] = role
+        if is_active is not None:
+            payload["is_active"] = is_active
+        if full_name is not None:
+            payload["full_name"] = full_name
+        if password is not None:
+            payload["password"] = password
+        data = self.patch(f"/api/v1/users/{user_id}", json=payload)
+        return cast(dict[str, Any], data or {})
+
     def close(self) -> None:
         """Close underlying HTTP transport connections."""
         self._http_client.close()
