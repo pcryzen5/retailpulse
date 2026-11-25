@@ -23,10 +23,14 @@ from sqlalchemy.orm import Session
 
 from retailpulse.db.models.core import FactDailySales, FactSalesLine
 from retailpulse.db.models.ml import ChurnScore, Forecast, ModelRun
-from retailpulse.db.models.ops import Alert, ModelPerformance
+from retailpulse.db.models.ops import ModelPerformance
 from retailpulse.errors import DomainValidationError
 from retailpulse.logging import get_logger
 from retailpulse.ml.forecasting.metrics import wape
+from retailpulse.monitoring.alerts import (
+    emit_churn_degraded_alert,
+    emit_forecast_degraded_alert,
+)
 from retailpulse.timeutil import utc_now
 
 logger = get_logger(__name__)
@@ -320,30 +324,16 @@ def compute_forecast_realized_wape(
 
     alert_created = False
     if is_degraded and alert_on_degradation:
-        dedupe_key = f"forecast_degraded:{model_run_id}:{eff_window_start}:{eff_window_end}"
-        existing_alert = session.execute(
-            sa.select(Alert).where(Alert.dedupe_key == dedupe_key, Alert.acknowledged_at.is_(None))
-        ).scalar_one_or_none()
-
-        if existing_alert is None:
-            alert = Alert(
-                severity="warning",
-                kind="forecast_degraded",
-                message=degradation_reason or f"Forecast degraded for model run {model_run_id}",
-                payload={
-                    "model_run_id": str(model_run_id),
-                    "realized_wape": round(realized_val, 4),
-                    "backtest_wape": round(backtest_wape, 4),
-                    "baseline_wape": round(baseline_val, 4) if baseline_val is not None else None,
-                    "n_observations": n_obs,
-                    "window_start": str(eff_window_start),
-                    "window_end": str(eff_window_end),
-                },
-                dedupe_key=dedupe_key,
-            )
-            session.add(alert)
-            session.flush()
-            alert_created = True
+        _, alert_created = emit_forecast_degraded_alert(
+            session=session,
+            model_run_id=model_run_id,
+            realized_wape=realized_val,
+            backtest_wape=backtest_wape,
+            baseline_wape=baseline_val,
+            window_start=eff_window_start,
+            window_end=eff_window_end,
+            reason=degradation_reason or f"Forecast degraded for model run {model_run_id}",
+        )
 
     snapshot = ModelPerformanceSnapshot(
         task="forecast",
@@ -561,33 +551,16 @@ def compute_churn_realized_pr_auc(
 
     alert_created = False
     if is_degraded and alert_on_degradation:
-        dedupe_key = f"churn_degraded:{model_run_id}:{window_start}:{window_end}"
-        existing_alert = session.execute(
-            sa.select(Alert).where(Alert.dedupe_key == dedupe_key, Alert.acknowledged_at.is_(None))
-        ).scalar_one_or_none()
-
-        if existing_alert is None:
-            alert = Alert(
-                severity="warning",
-                kind="churn_degraded",
-                message=(
-                    degradation_reason
-                    or f"Churn prediction degraded for model run {model_run_id}"
-                ),
-                payload={
-                    "model_run_id": str(model_run_id),
-                    "realized_pr_auc": round(realized_val, 4),
-                    "backtest_pr_auc": round(backtest_pr_auc, 4),
-                    "baseline_pr_auc": round(baseline_val, 4),
-                    "n_observations": n_obs,
-                    "window_start": str(window_start),
-                    "window_end": str(window_end),
-                },
-                dedupe_key=dedupe_key,
-            )
-            session.add(alert)
-            session.flush()
-            alert_created = True
+        _, alert_created = emit_churn_degraded_alert(
+            session=session,
+            model_run_id=model_run_id,
+            realized_pr_auc=realized_val,
+            backtest_pr_auc=backtest_pr_auc,
+            baseline_pr_auc=baseline_val,
+            window_start=window_start,
+            window_end=window_end,
+            reason=degradation_reason or f"Churn prediction degraded for model run {model_run_id}",
+        )
 
     snapshot = ModelPerformanceSnapshot(
         task="churn",

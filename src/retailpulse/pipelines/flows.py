@@ -48,6 +48,7 @@ from retailpulse.ingestion.adapters.generic_csv import GenericCSVAdapter
 from retailpulse.ingestion.adapters.online_retail_ii import OnlineRetailIIAdapter
 from retailpulse.ingestion.loaders import load_sales_dataset
 from retailpulse.logging import get_logger
+from retailpulse.monitoring.alerts import emit_pipeline_failure_alert
 from retailpulse.monitoring.drift import compute_drift_report, compute_forecast_drift
 from retailpulse.monitoring.performance import run_performance_monitoring_job
 from retailpulse.timeutil import utc_now
@@ -100,19 +101,13 @@ def _create_pipeline_failure_alert(
     details: dict[str, Any] | None = None,
 ) -> None:
     """Emit a critical operational alert when a workflow fails (ARCHITECTURE §6)."""
-    alert = Alert(
-        severity="critical",
-        kind="pipeline_failure",
-        message=f"Pipeline flow '{flow_name}' failed: {error_message}",
-        payload={
-            "flow_name": flow_name,
-            "pipeline_run_id": str(run_id),
-            "error": error_message,
-            "details": details or {},
-        },
-        dedupe_key=f"pipeline_failure:{flow_name}:{run_id}",
+    emit_pipeline_failure_alert(
+        session=session,
+        flow_name=flow_name,
+        run_id=run_id,
+        error_message=error_message,
+        details=details,
     )
-    session.add(alert)
     session.commit()
 
 

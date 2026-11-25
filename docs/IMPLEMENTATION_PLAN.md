@@ -151,7 +151,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P7-03 Promotion and rollback.** Service moves alias, flips `is_champion`, audit-logs, triggers `score_all`; refuses runs that failed the gate. *Verify:* tests for promote, rollback, refusal.
 - [x] **P7-04 Drift.** `monitoring/drift.py` Evidently wrapper; data and prediction drift; HTML plus summary row. *Verify:* contract test of the wrapper on the fixture.
 - [x] **P7-05 Performance monitoring.** Realized WAPE for elapsed forecasts; churn PR-AUC after the outcome window; `ops.model_performance`. *Verify:* test with injected actuals.
-- [ ] **P7-06 Alerts.** Rules and dedupe in `monitoring/alerts.py`; optional webhook (operator-set URL, timeout, no redirects). *Verify:* dedupe and webhook tests.
+- [x] **P7-06 Alerts.** Rules and dedupe in `monitoring/alerts.py`; optional webhook (operator-set URL, timeout, no redirects). *Verify:* dedupe and webhook tests.
 - [ ] **P7-07 Replay mode.** `retailpulse replay start --holdback-days 60` and `step`; runs 14 simulated days. *Verify:* `reports/replay_run.md` shows ≥ 95% flow success.
 - [ ] **P7-08 Retention and auto-promote.** Retention job per DATABASE §8; `RP_AUTO_PROMOTE` (default false) with tests. *Verify:* pruning keeps the active pointer's rows.
 
