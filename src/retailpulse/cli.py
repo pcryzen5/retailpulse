@@ -1750,3 +1750,241 @@ def run_worker() -> None:
     from retailpulse.pipelines.worker import serve_worker  # noqa: PLC0415
 
     serve_worker()
+
+
+# =====================================================================
+# Replay Command Group (P7-07)
+# =====================================================================
+
+replay_app = typer.Typer(
+    name="replay",
+    help="Historical replay mode for simulated operations and drift demonstration.",
+    no_args_is_help=True,
+)
+app.add_typer(replay_app, name="replay")
+
+
+@replay_app.command("start")
+def replay_start_command(
+    holdback_days: Annotated[
+        int,
+        typer.Option(
+            "--holdback-days",
+            help="Number of historical days to hold back (default: 60).",
+        ),
+    ] = 60,
+    source_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--source-path",
+            "-s",
+            help="Path to raw dataset (Parquet, XLSX, or CSV).",
+        ),
+    ] = None,
+    staging_dir: Annotated[
+        Path,
+        typer.Option(
+            "--staging-dir",
+            help="Directory for staging partitioned daily slices and state.",
+        ),
+    ] = Path("data/interim/replay"),
+) -> None:
+    """Initialize replay mode by partitioning held-back days into staged daily slices."""
+    from retailpulse.pipelines.replay import start_replay  # noqa: PLC0415
+
+    try:
+        state = start_replay(
+            holdback_days=holdback_days,
+            source_path=source_path,
+            staging_dir=staging_dir,
+        )
+        typer.secho(
+            f"Successfully initialized replay mode with {state.holdback_days}-day holdback!",
+            fg=typer.colors.GREEN,
+            bold=True,
+        )
+        typer.echo(f"  Source dataset:         {state.source_path}")
+        typer.echo(f"  Anchor date (cutoff):   {state.anchor_date}")
+        typer.echo(f"  Terminal dataset date:  {state.max_date}")
+        typer.echo(f"  Staged historical days: {state.total_days}")
+        typer.echo(f"  Staging directory:      {state.staging_dir}")
+        typer.echo("\nTo advance the simulation by one day, run:")
+        typer.secho("  retailpulse replay step", fg=typer.colors.CYAN)
+    except Exception as exc:
+        typer.secho(f"Failed to start replay mode: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+
+@replay_app.command("step")
+def replay_step_command(
+    days: Annotated[
+        int,
+        typer.Option(
+            "--days",
+            "-d",
+            help="Number of simulated days to advance (default: 1).",
+        ),
+    ] = 1,
+    staging_dir: Annotated[
+        Path,
+        typer.Option(
+            "--staging-dir",
+            help="Directory containing replay state and day slices.",
+        ),
+    ] = Path("data/interim/replay"),
+) -> None:
+    """Advance the replay simulation by N days, executing daily and scheduled weekly flows."""
+    from retailpulse.pipelines.replay import ReplayState, step_replay  # noqa: PLC0415
+
+    try:
+        step_records = step_replay(days=days, staging_dir=staging_dir)
+        if not step_records:
+            typer.secho("No days stepped. Replay may have concluded.", fg=typer.colors.YELLOW)
+            return
+
+        state = ReplayState.load(staging_dir / "state.json")
+        typer.secho(
+            f"Advanced replay by {len({r['simulated_date'] for r in step_records})} day(s). "
+            f"Current simulated date: {state.current_simulated_date}",
+            fg=typer.colors.GREEN,
+        )
+
+        for rec in step_records:
+            status_color = typer.colors.GREEN if rec["status"] == "succeeded" else typer.colors.RED
+            status_text = "OK" if rec["status"] == "succeeded" else "FAILED"
+            err_suffix = f" - Error: {rec['error']}" if rec.get("error") else ""
+            typer.echo(
+                f"  [{rec['simulated_date']}] {rec['flow_name']:<20} "
+                + typer.style(f"[{status_text}]", fg=status_color)
+                + f" ({rec['duration_seconds']:.3f}s){err_suffix}"
+            )
+        typer.echo(
+            f"\nReplay progress: {state.current_step_index}/{state.total_days} days | "
+            f"Success rate: {state.success_rate:.1f}% ({state.succeeded_flows_count}/"
+            f"{state.total_flows_count})"
+        )
+    except Exception as exc:
+        typer.secho(f"Failed to execute replay step: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+
+@replay_app.command("status")
+def replay_status_command(
+    staging_dir: Annotated[
+        Path,
+        typer.Option(
+            "--staging-dir",
+            help="Directory containing replay state.",
+        ),
+    ] = Path("data/interim/replay"),
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output status as JSON.",
+        ),
+    ] = False,
+) -> None:
+    """Display current status, progress, and success metrics of replay mode."""
+    from retailpulse.pipelines.replay import get_replay_status  # noqa: PLC0415
+
+    status = get_replay_status(staging_dir=staging_dir)
+    if json_output:
+        typer.echo(json.dumps(status, indent=2))
+        return
+
+    if not status.get("is_active"):
+        typer.secho(status.get("message", "Replay is inactive."), fg=typer.colors.YELLOW)
+        return
+
+    typer.secho("================ Replay Mode Status ================", fg=typer.colors.CYAN)
+    typer.echo(f"  Holdback window:        {status['holdback_days']} calendar days")
+    typer.echo(f"  Anchor date (cutoff):   {status['anchor_date']}")
+    typer.echo(f"  Current simulated date: {status['current_simulated_date']}")
+    typer.echo(f"  Dataset terminal date:  {status['max_date']}")
+    typer.echo(f"  Steps completed:        {status['current_step_index']} / {status['total_days']}")
+    typer.echo(f"  Days remaining:         {status['days_remaining']}")
+    typer.echo(f"  Total flow executions:  {status['total_flows_count']}")
+    typer.echo(f"  Successful executions:  {status['succeeded_flows_count']}")
+    typer.echo(f"  Failed executions:      {status['failed_flows_count']}")
+
+    rate_color = typer.colors.GREEN if status["success_rate"] >= 95.0 else typer.colors.RED
+    typer.secho(
+        f"  Overall success rate:   {status['success_rate']:.2f}%",
+        fg=rate_color,
+        bold=True,
+    )
+
+
+@replay_app.command("run")
+def replay_run_command(
+    days: Annotated[
+        int,
+        typer.Option(
+            "--days",
+            "-d",
+            help="Number of simulated days to run end-to-end (default: 14).",
+        ),
+    ] = 14,
+    holdback_days: Annotated[
+        int,
+        typer.Option(
+            "--holdback-days",
+            help="Number of historical days to hold back (default: 60).",
+        ),
+    ] = 60,
+    source_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--source-path",
+            "-s",
+            help="Path to raw dataset.",
+        ),
+    ] = None,
+    report_path: Annotated[
+        Path,
+        typer.Option(
+            "--report-path",
+            "-r",
+            help="Output Markdown report path (default: reports/replay_run.md).",
+        ),
+    ] = Path("reports/replay_run.md"),
+    staging_dir: Annotated[
+        Path,
+        typer.Option(
+            "--staging-dir",
+            help="Directory for staging partitioned daily slices and state.",
+        ),
+    ] = Path("data/interim/replay"),
+) -> None:
+    """Run an automated N-day simulation and produce the verification report."""
+    from retailpulse.pipelines.replay import run_replay_simulation  # noqa: PLC0415
+
+    typer.secho(
+        f"Starting {days}-day automated historical replay simulation...",
+        fg=typer.colors.CYAN,
+        bold=True,
+    )
+    try:
+        summary = run_replay_simulation(
+            days=days,
+            holdback_days=holdback_days,
+            source_path=source_path,
+            report_path=report_path,
+            staging_dir=staging_dir,
+        )
+        typer.secho(
+            f"\nReplay simulation finished successfully! Status: {summary['status'].upper()}",
+            fg=typer.colors.GREEN,
+            bold=True,
+        )
+        typer.echo(f"  Days simulated:  {summary['days_simulated']}")
+        typer.echo(f"  Flow runs total: {summary['total_flows']}")
+        typer.echo(f"  Succeeded flows: {summary['succeeded_flows']}")
+        typer.echo(f"  Failed flows:    {summary['failed_flows']}")
+        typer.echo(f"  Success rate:    {summary['success_rate']:.2f}% (Target: >= 95.0%)")
+        typer.echo(f"  Report written:  {summary['report_path']}")
+    except Exception as exc:
+        typer.secho(f"Replay simulation failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
