@@ -690,6 +690,70 @@ class ApiClient:
         data = self.post(f"/api/v1/alerts/{alert_id}/ack")
         return cast(dict[str, Any], data or {})
 
+    def upload_sales_file(
+        self,
+        file_bytes: bytes,
+        filename: str,
+        source_name: str = "generic_csv",
+    ) -> dict[str, Any]:
+        """Upload a sales file for streaming validation and ETL ingestion (Analyst+ only)."""
+        files = {"file": (filename, file_bytes, "application/octet-stream")}
+        data = {"source_name": source_name}
+        res = self.request("POST", "/api/v1/uploads/sales", data=data, files=files)
+        return cast(dict[str, Any], res.json())
+
+    def get_uploads(
+        self,
+        status: str | None = None,
+        source_name: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict[str, Any]:
+        """Fetch paginated list of file ingestion batches (Analyst+ only)."""
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
+        if status and status.lower() != "all":
+            params["status"] = status.lower()
+        if source_name and source_name.lower() != "all":
+            params["source_name"] = source_name.lower()
+        data = self.get("/api/v1/uploads", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def get_upload_batch(self, batch_id: str) -> dict[str, Any]:
+        """Fetch details and quality results of a specific ingestion batch (Analyst+ only)."""
+        data = self.get(f"/api/v1/uploads/{batch_id}")
+        return cast(dict[str, Any], data or {})
+
+    def get_pipeline_runs(
+        self,
+        flow_name: str | None = None,
+        status: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict[str, Any]:
+        """Fetch paginated list of pipeline runs (Viewer+)."""
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
+        if flow_name and flow_name.lower() != "all":
+            params["flow_name"] = flow_name.lower()
+        if status and status.lower() != "all":
+            params["status"] = status.lower()
+        data = self.get("/api/v1/pipelines/runs", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def get_pipeline_run(self, run_id: str) -> dict[str, Any]:
+        """Fetch execution state, timing, and errors for a specific pipeline run (Viewer+)."""
+        data = self.get(f"/api/v1/pipelines/runs/{run_id}")
+        return cast(dict[str, Any], data or {})
+
+    def trigger_pipeline(
+        self,
+        flow_name: str,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Trigger an orchestration workflow run with concurrency gating (Analyst+ or Admin)."""
+        payload: dict[str, Any] = {"params": params or {}}
+        data = self.post(f"/api/v1/pipelines/{flow_name}/trigger", json=payload)
+        return cast(dict[str, Any], data or {})
+
     def close(self) -> None:
         """Close underlying HTTP transport connections."""
         self._http_client.close()
