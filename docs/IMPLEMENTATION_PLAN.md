@@ -146,7 +146,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P6-11 Polish.** Accessibility checklist (DESIGN §8), screenshots for README. *Verify:* checklist ticked in the PR.
 
 ### Phase 7 — MLOps and orchestration
-- [ ] **P7-01 Flows.** `pipelines/flows.py`: `etl`, `score_all`, `train_forecast`, `train_segmentation`, `train_churn`, `drift_check` wrapping existing functions, with `ops.pipeline_run` bookkeeping, retries, timeouts. *Verify:* tests call the underlying functions; failure marks the run `failed` and creates an alert.
+- [x] **P7-01 Flows.** `pipelines/flows.py`: `etl`, `score_all`, `train_forecast`, `train_segmentation`, `train_churn`, `drift_check` wrapping existing functions, with `ops.pipeline_run` bookkeeping, retries, timeouts. *Verify:* tests call the underlying functions; failure marks the run `failed` and creates an alert.
 - [ ] **P7-02 Worker and schedules.** Served deployments with the schedules in ARCHITECTURE §6; `PrefectTrigger`; compose wiring. *Verify:* triggering `etl` from the API completes end to end in compose.
 - [ ] **P7-03 Promotion and rollback.** Service moves alias, flips `is_champion`, audit-logs, triggers `score_all`; refuses runs that failed the gate. *Verify:* tests for promote, rollback, refusal.
 - [ ] **P7-04 Drift.** `monitoring/drift.py` Evidently wrapper; data and prediction drift; HTML plus summary row. *Verify:* contract test of the wrapper on the fixture.
