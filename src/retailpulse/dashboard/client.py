@@ -591,6 +591,89 @@ class ApiClient:
         response = self.request("GET", "/api/v1/customers/export", params=params)
         return response.content
 
+    def get_models(
+        self,
+        *,
+        task: str | None = None,
+        is_champion: bool | None = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        """Fetch list of trained model runs."""
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
+        if task:
+            params["task"] = task
+        if is_champion is not None:
+            params["is_champion"] = is_champion
+        data = self.get("/api/v1/models", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def get_model_run(self, run_id: str) -> dict[str, Any]:
+        """Fetch details for a specific model run."""
+        data = self.get(f"/api/v1/models/{run_id}")
+        return cast(dict[str, Any], data or {})
+
+    def promote_model(
+        self,
+        run_id: str,
+        reason: str = "Promoted from dashboard",
+    ) -> dict[str, Any]:
+        """Promote a challenger model to active champion (Admin only)."""
+        data = self.post(f"/api/v1/models/{run_id}/promote", json={"reason": reason})
+        return cast(dict[str, Any], data or {})
+
+    def train_model(
+        self,
+        *,
+        task: str = "forecast",
+        algorithm: str | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Trigger an asynchronous or synchronous model training run (Admin only)."""
+        payload: dict[str, Any] = {"task": task}
+        if algorithm:
+            payload["algorithm"] = algorithm
+        if params:
+            payload["params"] = params
+        data = self.post("/api/v1/models/train", json=payload)
+        return cast(dict[str, Any], data or {})
+
+    def get_model_performance(
+        self,
+        *,
+        task: str = "forecast",
+        page: int = 1,
+        page_size: int = 100,
+    ) -> dict[str, Any]:
+        """Fetch realized error performance tracking snapshots."""
+        params: dict[str, Any] = {"task": task, "page": page, "page_size": page_size}
+        data = self.get("/api/v1/monitoring/performance", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def get_drift_reports(
+        self,
+        *,
+        task: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict[str, Any]:
+        """Fetch list of Evidently drift reports."""
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
+        if task:
+            params["task"] = task
+        data = self.get("/api/v1/monitoring/drift", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def get_drift_report(self, report_id: str) -> dict[str, Any]:
+        """Fetch detailed metrics and summary for a drift report."""
+        data = self.get(f"/api/v1/monitoring/drift/{report_id}")
+        return cast(dict[str, Any], data or {})
+
+    def get_drift_report_html(self, report_id: str) -> str:
+        """Fetch stored visual Evidently HTML dashboard string."""
+        res = self.request("GET", f"/api/v1/monitoring/drift/{report_id}/html")
+        return res.text
+
     def get_alerts(
         self,
         status: str = "open",
