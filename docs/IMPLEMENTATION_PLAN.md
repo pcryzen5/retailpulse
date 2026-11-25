@@ -149,7 +149,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P7-01 Flows.** `pipelines/flows.py`: `etl`, `score_all`, `train_forecast`, `train_segmentation`, `train_churn`, `drift_check` wrapping existing functions, with `ops.pipeline_run` bookkeeping, retries, timeouts. *Verify:* tests call the underlying functions; failure marks the run `failed` and creates an alert.
 - [x] **P7-02 Worker and schedules.** Served deployments with the schedules in ARCHITECTURE §6; `PrefectTrigger`; compose wiring. *Verify:* triggering `etl` from the API completes end to end in compose.
 - [x] **P7-03 Promotion and rollback.** Service moves alias, flips `is_champion`, audit-logs, triggers `score_all`; refuses runs that failed the gate. *Verify:* tests for promote, rollback, refusal.
-- [ ] **P7-04 Drift.** `monitoring/drift.py` Evidently wrapper; data and prediction drift; HTML plus summary row. *Verify:* contract test of the wrapper on the fixture.
+- [x] **P7-04 Drift.** `monitoring/drift.py` Evidently wrapper; data and prediction drift; HTML plus summary row. *Verify:* contract test of the wrapper on the fixture.
 - [ ] **P7-05 Performance monitoring.** Realized WAPE for elapsed forecasts; churn PR-AUC after the outcome window; `ops.model_performance`. *Verify:* test with injected actuals.
 - [ ] **P7-06 Alerts.** Rules and dedupe in `monitoring/alerts.py`; optional webhook (operator-set URL, timeout, no redirects). *Verify:* dedupe and webhook tests.
 - [ ] **P7-07 Replay mode.** `retailpulse replay start --holdback-days 60` and `step`; runs 14 simulated days. *Verify:* `reports/replay_run.md` shows ≥ 95% flow success.

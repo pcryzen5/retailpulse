@@ -48,6 +48,7 @@ from retailpulse.ingestion.adapters.generic_csv import GenericCSVAdapter
 from retailpulse.ingestion.adapters.online_retail_ii import OnlineRetailIIAdapter
 from retailpulse.ingestion.loaders import load_sales_dataset
 from retailpulse.logging import get_logger
+from retailpulse.monitoring.drift import compute_drift_report, compute_forecast_drift
 from retailpulse.timeutil import utc_now
 
 logger = get_logger(__name__)
@@ -321,28 +322,38 @@ def _run_train_churn_flow(run_id: uuid.UUID, params: dict[str, Any]) -> dict[str
 
 def _run_drift_check_flow(run_id: uuid.UUID, params: dict[str, Any]) -> dict[str, Any]:
     """Execute feature and prediction drift check (Evidently) and check thresholds."""
-    del run_id, params
+    del run_id
+    params = params or {}
     with session_scope() as session:
-        today = utc_now().date()
-        report = DriftReport(
-            report_id=uuid.uuid4(),
-            task="forecast",
-            kind="data",
-            reference_start=today - datetime.timedelta(days=90),
-            reference_end=today - datetime.timedelta(days=30),
-            current_start=today - datetime.timedelta(days=29),
-            current_end=today,
-            dataset_drift=False,
-            share_drifted_features=0.08,
-            summary={"drifted_features": ["quantity_lag_7"]},
-            report_path="reports/drift/drift_forecast_latest.html",
-        )
-        session.add(report)
-        session.commit()
+        ref_df = params.get("reference_data")
+        curr_df = params.get("current_data")
+        task = params.get("task", "forecast")
+        kind = params.get("kind", "data")
+
+        if ref_df is not None and curr_df is not None:
+            report = _execute_with_retry(
+                lambda: compute_drift_report(
+                    reference_data=ref_df,
+                    current_data=curr_df,
+                    session=session,
+                    task=task,
+                    kind=kind,
+                ),
+                step_name="drift_check_custom",
+            )
+        else:
+            report = _execute_with_retry(
+                lambda: compute_forecast_drift(
+                    session=session,
+                    kind=kind,
+                ),
+                step_name="drift_check_forecast",
+            )
 
         return {
             "report_id": str(report.report_id),
             "task": report.task,
+            "kind": report.kind,
             "dataset_drift": report.dataset_drift,
             "share_drifted": float(report.share_drifted_features or 0.0),
         }
