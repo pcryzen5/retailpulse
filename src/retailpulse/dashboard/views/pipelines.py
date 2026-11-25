@@ -372,11 +372,13 @@ def render_pipelines_view() -> None:
     # 4. Pipeline Execution Runs Table (Viewer+)
     has_active_runs = _render_pipeline_runs_table(client)
 
-    # Auto-refresh notice / countdown when runs are active
+    # Auto-refresh notice / toggle when runs are active
     if has_active_runs:
-        st.info("Active pipeline runs detected. Auto-refreshing every 60 seconds.")
-        # Trigger Streamlit rerun after 60s if active
-        # st.rerun() or sleep pattern handled in background polling
+        col_ref1, col_ref2 = st.columns([3, 1])
+        with col_ref1:
+            st.info("Active runs detected. You can enable automatic 60s status polling.")
+        with col_ref2:
+            st.checkbox("Auto-refresh (60s)", value=False, key="pipe_autorefresh")
 
 
 if __name__ == "__main__" or "streamlit" in globals():

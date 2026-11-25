@@ -143,7 +143,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P6-08 Monitoring.** Models, performance, drift, alerts; admin-only actions. *Verify:* AppTest per role.
 - [x] **P6-09 Data and Pipelines.** Upload, status polling, triggers. *Verify:* AppTest with stub upload.
 - [x] **P6-10 Admin Users.** *Verify:* AppTest; last-admin protection message.
-- [ ] **P6-11 Polish.** Accessibility checklist (DESIGN §8), screenshots for README. *Verify:* checklist ticked in the PR.
+- [x] **P6-11 Polish.** Accessibility checklist (DESIGN §8), screenshots for README. *Verify:* checklist ticked in the PR.
 
 ### Phase 7 — MLOps and orchestration
 - [ ] **P7-01 Flows.** `pipelines/flows.py`: `etl`, `score_all`, `train_forecast`, `train_segmentation`, `train_churn`, `drift_check` wrapping existing functions, with `ops.pipeline_run` bookkeeping, retries, timeouts. *Verify:* tests call the underlying functions; failure marks the run `failed` and creates an alert.

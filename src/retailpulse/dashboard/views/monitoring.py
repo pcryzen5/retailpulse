@@ -215,9 +215,21 @@ def _render_single_model_card(
         st.markdown(format_status_badge("champion" if is_champ else "challenger"))
         st.caption(f"Trained: {format_date(m.get('trained_at'))}")
 
-        st.metric("WAPE", f"{float(metrics.get('wape', 0.42)):.3f}")
-        st.metric("MASE", f"{float(metrics.get('mase', 0.88)):.3f}")
-        st.metric("Coverage (80%)", format_percent(metrics.get("coverage", 0.78), is_ratio=True))
+        st.metric(
+            "WAPE",
+            f"{float(metrics.get('wape', 0.42)):.3f}",
+            help="Weighted Absolute Percentage Error - overall demand volume forecast accuracy.",
+        )
+        st.metric(
+            "MASE",
+            f"{float(metrics.get('mase', 0.88)):.3f}",
+            help="Mean Absolute Scaled Error (< 1.0 beats naive baseline).",
+        )
+        st.metric(
+            "Coverage (80%)",
+            format_percent(metrics.get("coverage", 0.78), is_ratio=True),
+            help="Prediction interval coverage probability - actuals within 80% confidence bounds.",
+        )
 
         if is_admin and not is_champ and st.button(
             f"Promote to Champion ({run_id[:8]})",
