@@ -229,8 +229,8 @@ async def domain_exception_handler(  # noqa: PLR0915
         title = "Data Ingestion / Quality Error"
         detail = exc.message
     elif isinstance(exc, ModelGateError):
-        status_code = 422
-        suffix = "validation_error"
+        status_code = 409
+        suffix = "conflict"
         title = "Model Gate Validation Failed"
         detail = exc.message
     elif isinstance(exc, ServiceUnavailableError):

@@ -34,6 +34,8 @@ from retailpulse.db.models.ops import PipelineRun
 from retailpulse.db.session import get_db
 from retailpulse.errors import ConflictError, DomainValidationError, NotFoundError
 from retailpulse.logging import get_logger
+from retailpulse.pipelines.promotion import promote_model_run, rollback_model_run
+from retailpulse.pipelines.trigger import PipelineTrigger, get_pipeline_trigger
 from retailpulse.security.audit import log_audit
 
 router = APIRouter(tags=["Models"])
@@ -119,6 +121,7 @@ class PromoteModelResponse(BaseModel):
     run_id: uuid.UUID
     previous_champion_run_id: uuid.UUID | None = None
     score_all_pipeline_run_id: uuid.UUID
+    is_rollback: bool = False
 
 
 # --- Helpers ---
@@ -337,88 +340,56 @@ def train_model(  # noqa: PLR0917
     summary="Promote model run to champion and trigger score_all (Admin only)",
 )
 @limiter.limit("20/hour")
-def promote_model(
+async def promote_model(
     request: Request,
     run_id: uuid.UUID,
     current_user: Annotated[AppUser, Depends(require_role("admin"))],
     session: Annotated[Session, Depends(get_db)],
+    trigger: Annotated[PipelineTrigger, Depends(get_pipeline_trigger)],
 ) -> PromoteModelResponse:
     """Promote a successful, gate-passed model run to champion status."""
     del request
-    model = session.get(ModelRun, run_id)
-    if model is None:
-        raise NotFoundError(f"Model run {run_id} not found")
-
-    # 1. Verify status is succeeded
-    if model.status != "succeeded":
-        raise ConflictError(
-            f"Cannot promote model run {run_id} with status '{model.status}'; "
-            "only succeeded runs may be promoted."
-        )
-
-    # 2. Verify model passed its evaluation gate
-    gate_passed = model.metrics.get("gate_passed", True)
-    if not gate_passed:
-        gate_reason = model.metrics.get("gate_reason", "Failed evaluation gate")
-        raise ConflictError(f"Model run {run_id} did not pass the promotion gate: {gate_reason}")
-
-    task = model.task
-
-    # 3. Find current champion for this task
-    prev_champ = session.execute(
-        sa.select(ModelRun).where(
-            ModelRun.task == task,
-            ModelRun.is_champion.is_(True),
-        )
-    ).scalar_one_or_none()
-
-    prev_champ_id: uuid.UUID | None = None
-    if prev_champ is not None:
-        prev_champ_id = prev_champ.run_id
-        if prev_champ.run_id != model.run_id:
-            prev_champ.is_champion = False
-
-    model.is_champion = True
-
-    # 4. Trigger score_all pipeline run
-    score_active = session.execute(
-        sa.select(PipelineRun).where(
-            PipelineRun.flow_name == "score_all",
-            PipelineRun.status.in_(["queued", "running"]),
-        )
-    ).scalar_one_or_none()
-
-    if score_active is not None:
-        score_all_id = score_active.run_id
-    else:
-        score_run = PipelineRun(
-            run_id=uuid.uuid4(),
-            flow_name="score_all",
-            trigger="promote",
-            status="queued",
-            params={"promoted_run_id": str(model.run_id), "task": task},
-            requested_by=current_user.user_id,
-        )
-        session.add(score_run)
-        score_all_id = score_run.run_id
-
-    # 5. SEC-LOG-01: Audit log promote action
-    log_audit(
+    result = await promote_model_run(
+        run_id=run_id,
         session=session,
-        action="promote",
-        user_id=current_user.user_id,
-        resource=f"model:{task}:{model.run_id}",
-        details={
-            "previous_champion_run_id": str(prev_champ_id) if prev_champ_id else None,
-            "score_all_pipeline_run_id": str(score_all_id),
-        },
+        actor_id=current_user.user_id,
+        pipeline_trigger=trigger,
+    )
+    return PromoteModelResponse(
+        task=result.task,
+        run_id=result.run_id,
+        previous_champion_run_id=result.previous_champion_run_id,
+        score_all_pipeline_run_id=result.score_all_pipeline_run_id,
+        is_rollback=result.is_rollback,
     )
 
-    session.commit()
 
-    return PromoteModelResponse(
+@router.post(
+    "/models/{task}/rollback",
+    response_model=PromoteModelResponse,
+    operation_id="rollback_model_champion",
+    summary="Roll back model champion to previous champion and trigger score_all (Admin only)",
+)
+@limiter.limit("20/hour")
+async def rollback_model(
+    request: Request,
+    task: str,
+    current_user: Annotated[AppUser, Depends(require_role("admin"))],
+    session: Annotated[Session, Depends(get_db)],
+    trigger: Annotated[PipelineTrigger, Depends(get_pipeline_trigger)],
+) -> PromoteModelResponse:
+    """Roll back champion model for a task to the previous champion."""
+    del request
+    result = await rollback_model_run(
         task=task,
-        run_id=model.run_id,
-        previous_champion_run_id=prev_champ_id,
-        score_all_pipeline_run_id=score_all_id,
+        session=session,
+        actor_id=current_user.user_id,
+        pipeline_trigger=trigger,
+    )
+    return PromoteModelResponse(
+        task=result.task,
+        run_id=result.run_id,
+        previous_champion_run_id=result.previous_champion_run_id,
+        score_all_pipeline_run_id=result.score_all_pipeline_run_id,
+        is_rollback=result.is_rollback,
     )

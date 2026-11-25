@@ -1,5 +1,10 @@
 """Prefect workflows and pipeline orchestration."""
 
+from retailpulse.pipelines.promotion import (
+    PromoteResult,
+    promote_model_run,
+    rollback_model_run,
+)
 from retailpulse.pipelines.trigger import (
     InlinePipelineTrigger,
     NoopPipelineTrigger,
@@ -13,5 +18,8 @@ __all__ = [
     "NoopPipelineTrigger",
     "PipelineTrigger",
     "PrefectTrigger",
+    "PromoteResult",
     "get_pipeline_trigger",
+    "promote_model_run",
+    "rollback_model_run",
 ]
