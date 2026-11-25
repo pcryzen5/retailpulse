@@ -139,7 +139,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P6-04 Demand Forecast.** *Verify:* AppTest; ineligible SKU shows the reason.
 - [x] **P6-05 Segments.** *Verify:* AppTest.
 - [x] **P6-06 Churn Risk.** Filters, reasons chart, export (analyst+). *Verify:* AppTest; viewer has no export button.
-- [ ] **P6-07 Inventory.** Table, what-if, save with confirmation, simulation, export, synthetic notice. *Verify:* AppTest; notice present when `params_source = synthetic`.
+- [x] **P6-07 Inventory.** Table, what-if, save with confirmation, simulation, export, synthetic notice. *Verify:* AppTest; notice present when `params_source = synthetic`.
 - [ ] **P6-08 Monitoring.** Models, performance, drift, alerts; admin-only actions. *Verify:* AppTest per role.
 - [ ] **P6-09 Data and Pipelines.** Upload, status polling, triggers. *Verify:* AppTest with stub upload.
 - [ ] **P6-10 Admin Users.** *Verify:* AppTest; last-admin protection message.

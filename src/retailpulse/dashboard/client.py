@@ -444,20 +444,88 @@ class ApiClient:
         data = self.get("/api/v1/forecasts/accuracy")
         return cast(dict[str, Any], data or {})
 
+    def get_inventory_summary(self) -> dict[str, Any]:
+        """Fetch aggregate inventory summary, status counts, and synthetic share."""
+        data = self.get("/api/v1/inventory/summary")
+        return cast(dict[str, Any], data or {})
+
     def get_inventory_recommendations(
         self,
+        *,
         status: str | None = None,
+        abc_class: str | None = None,
+        q: str | None = None,
         page: int = 1,
         page_size: int = 50,
         sort_by: str | None = None,
+        sort_dir: str = "desc",
     ) -> dict[str, Any]:
         """Fetch paginated inventory replenishment recommendations."""
-        params: dict[str, Any] = {"page": page, "page_size": page_size}
-        if status:
-            params["status"] = status
+        params: dict[str, Any] = {"page": page, "page_size": page_size, "sort_dir": sort_dir}
+        if status and status.lower() != "all":
+            params["status"] = status.lower()
+        if abc_class and abc_class.lower() != "all":
+            params["abc_class"] = abc_class.upper()
+        if q:
+            params["q"] = q
         if sort_by:
             params["sort_by"] = sort_by
         data = self.get("/api/v1/inventory/recommendations", params=params)
+        return cast(dict[str, Any], data or {})
+
+    def export_inventory_recommendations_csv(
+        self,
+        *,
+        status: str | None = None,
+        abc_class: str | None = None,
+        q: str | None = None,
+    ) -> bytes:
+        """Export inventory recommendations as CSV (Analyst+ only)."""
+        params: dict[str, Any] = {}
+        if status and status.lower() != "all":
+            params["status"] = status.lower()
+        if abc_class and abc_class.lower() != "all":
+            params["abc_class"] = abc_class.upper()
+        if q:
+            params["q"] = q
+        response = self.request("GET", "/api/v1/inventory/recommendations/export", params=params)
+        return response.content
+
+    def get_inventory_params(self, product_id: int, store_id: int = 1) -> dict[str, Any]:
+        """Fetch current inventory policy parameters for a product."""
+        data = self.get(f"/api/v1/inventory/params/{product_id}", params={"store_id": store_id})
+        return cast(dict[str, Any], data or {})
+
+    def update_inventory_params(
+        self,
+        product_id: int,
+        payload: dict[str, Any],
+        store_id: int = 1,
+    ) -> dict[str, Any]:
+        """Update inventory policy parameters for a product (Analyst+ only)."""
+        data = self.put(
+            f"/api/v1/inventory/params/{product_id}",
+            json=payload,
+            params={"store_id": store_id},
+        )
+        return cast(dict[str, Any], data or {})
+
+    def compute_inventory_what_if(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Compute non-persistent what-if inventory reorder calculations."""
+        data = self.post("/api/v1/inventory/what-if", json=payload)
+        return cast(dict[str, Any], data or {})
+
+    def run_inventory_simulation(
+        self,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Run synchronous policy simulation against historical demand (Analyst+ only)."""
+        data = self.post("/api/v1/inventory/simulate", json=payload or {})
+        return cast(dict[str, Any], data or {})
+
+    def get_latest_inventory_simulation(self) -> dict[str, Any]:
+        """Retrieve most recent policy simulation benchmark results."""
+        data = self.get("/api/v1/inventory/simulations/latest")
         return cast(dict[str, Any], data or {})
 
     def get_segments(self) -> list[dict[str, Any]]:
