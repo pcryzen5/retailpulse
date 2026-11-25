@@ -49,6 +49,7 @@ from retailpulse.ingestion.adapters.online_retail_ii import OnlineRetailIIAdapte
 from retailpulse.ingestion.loaders import load_sales_dataset
 from retailpulse.logging import get_logger
 from retailpulse.monitoring.drift import compute_drift_report, compute_forecast_drift
+from retailpulse.monitoring.performance import run_performance_monitoring_job
 from retailpulse.timeutil import utc_now
 
 logger = get_logger(__name__)
@@ -350,12 +351,16 @@ def _run_drift_check_flow(run_id: uuid.UUID, params: dict[str, Any]) -> dict[str
                 step_name="drift_check_forecast",
             )
 
+        # Run realized error & performance monitoring across elapsed models (ARCHITECTURE §6)
+        perf_snapshots = run_performance_monitoring_job(session=session)
+
         return {
             "report_id": str(report.report_id),
             "task": report.task,
             "kind": report.kind,
             "dataset_drift": report.dataset_drift,
             "share_drifted": float(report.share_drifted_features or 0.0),
+            "performance_snapshots": len(perf_snapshots),
         }
 
 
