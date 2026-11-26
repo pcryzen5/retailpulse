@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint & Format Check
+    name: Lint & Style Gates
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -30,13 +30,16 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv sync --frozen --group dev
+        run: uv sync --frozen --group dev --group core
 
       - name: Ruff check
         run: uv run ruff check .
 
       - name: Ruff format check
         run: uv run ruff format --check .
+
+      - name: Import linter architecture contracts
+        run: uv run lint-imports
 
   typecheck:
     name: Type Check (mypy)
@@ -62,9 +65,29 @@ jobs:
       - name: Run mypy
         run: uv run mypy src tests
 
-  unit-tests:
-    name: Unit Tests
+  test-and-coverage:
+    name: Test & Coverage Gate (Postgres)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: retailpulse
+          POSTGRES_PASSWORD: retailpulse_password
+          POSTGRES_DB: retailpulse_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready -U retailpulse -d retailpulse_test
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      RP_DATABASE_URL: postgresql+psycopg://retailpulse:retailpulse_password@localhost:5432/retailpulse_test
+      RP_ENV: test
+      RP_AUTO_PROMOTE: "false"
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -80,8 +103,35 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: uv sync --frozen --group dev --group core
+      - name: Install all dependencies
+        run: uv sync --frozen --all-groups
 
-      - name: Run unit tests
-        run: uv run pytest -m "unit and not slow" tests/
+      - name: Run database migrations on test database
+        run: uv run alembic upgrade head
+
+      - name: Run unit & integration tests with branch coverage
+        run: >-
+          uv run pytest
+          --cov=src/retailpulse
+          --cov-branch
+          --cov-report=term-missing
+          --cov-report=xml
+          --cov-fail-under=80
+          tests/
+
+      - name: Enforce per-module coverage thresholds (TESTING §6)
+        run: |
+          echo "Checking security coverage (>= 95%)..."
+          uv run coverage report --include="src/retailpulse/security/*,src/retailpulse/ml/inventory/policy.py" --fail-under=95
+
+          echo "Checking core ETL, features, ML math coverage (>= 90%)..."
+          uv run coverage report --include="src/retailpulse/etl/*,src/retailpulse/features/*,src/retailpulse/ml/forecasting/metrics.py,src/retailpulse/ml/forecasting/backtest.py,src/retailpulse/ml/forecasting/intervals.py" --fail-under=90
+
+          echo "Checking API coverage (>= 85%)..."
+          uv run coverage report --include="src/retailpulse/api/*" --fail-under=85
+
+          echo "Checking pipelines coverage (>= 75%)..."
+          uv run coverage report --include="src/retailpulse/pipelines/*" --fail-under=75
+
+          echo "Checking dashboard coverage (>= 60%)..."
+          uv run coverage report --include="src/retailpulse/dashboard/*" --fail-under=60

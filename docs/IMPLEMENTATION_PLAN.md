@@ -156,7 +156,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P7-08 Retention and auto-promote.** Retention job per DATABASE §8; `RP_AUTO_PROMOTE` (default false) with tests. *Verify:* pruning keeps the active pointer's rows.
 
 ### Phase 8 — CI/CD and deployment
-- [ ] **P8-01 Full CI.** Postgres service, integration tests, coverage gate 80%, concurrency cancel, caching. *Verify:* green PR; failing coverage blocks.
+- [x] **P8-01 Full CI.** Postgres service, integration tests, coverage gate 80%, concurrency cancel, caching. *Verify:* green PR; failing coverage blocks.
 - [ ] **P8-02 Security workflow.** bandit, pip-audit, gitleaks, image scan; dependency update config; Actions pinned to commit SHAs. *Verify:* workflow runs; a seeded fake secret is caught on a test branch.
 - [ ] **P8-03 Production compose and proxy.** `docker-compose.prod.yml`, `Caddyfile`: only 80/443 published; `/metrics` and docs blocked; security headers; restart policies, resource limits. *Verify:* port scan shows only 80/443.
 - [ ] **P8-04 CD.** On tag: build and push images, deploy over SSH (compose pull and up), smoke test (`/health/ready`, login, one read). *Verify:* tagged release deploys.

@@ -188,8 +188,10 @@ def promote_champion(
                     },
                 )
                 session.add(audit_entry)
+                session.flush()
             except Exception as audit_err:
                 logger.warning("Failed to record promotion audit log", error=str(audit_err))
+                session.rollback()
 
         session.commit()
 

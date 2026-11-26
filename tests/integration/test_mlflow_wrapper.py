@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from retailpulse.db.models.core import DimCustomer, DimDate, DimProduct, DimStore
 from retailpulse.db.models.ml import ForecastMetric, ModelRun
+from retailpulse.db.models.ops import AuditLog
 from retailpulse.ml.registry import (
     ALIAS_CHAMPION,
     ALIAS_PREVIOUS_CHAMPION,
@@ -69,6 +70,7 @@ def ml_db_session() -> Session:
         cast(sa.Table, DimDate.__table__),
         cast(sa.Table, ModelRun.__table__),
         cast(sa.Table, ForecastMetric.__table__),
+        cast(sa.Table, AuditLog.__table__),
     ]
     for table in tables:
         table.create(engine)
