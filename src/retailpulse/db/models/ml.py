@@ -138,6 +138,13 @@ class Forecast(Base):
             name="ck_forecast_bounds",
         ),
         Index("ix_forecast_lookup", "product_id", "store_id", "target_date"),
+        Index(
+            "ix_forecast_run_prod_store_target",
+            "model_run_id",
+            "product_id",
+            "store_id",
+            "target_date",
+        ),
         {"schema": "ml"},
     )
 
@@ -270,6 +277,13 @@ class ChurnScore(Base):
         CheckConstraint("churn_probability BETWEEN 0 AND 1", name="ck_churn_score_prob_range"),
         CheckConstraint("risk_band IN ('low', 'medium', 'high')", name="ck_churn_score_risk_band"),
         Index("ix_churn_score_lookup", "customer_id", text("as_of_date DESC")),
+        Index(
+            "ix_churn_score_run_date_band",
+            "model_run_id",
+            "as_of_date",
+            "risk_band",
+            text("churn_probability DESC"),
+        ),
         {"schema": "ml"},
     )
 
@@ -314,6 +328,7 @@ class InventoryRecommendation(Base):
             name="uq_inventory_rec_tuple",
         ),
         Index("ix_inv_rec_urgency", "as_of_date", text("reorder_urgency DESC")),
+        Index("ix_inv_rec_run_date_status", "forecast_run_id", "as_of_date", "status"),
         {"schema": "ml"},
     )
 

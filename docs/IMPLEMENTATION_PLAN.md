@@ -165,7 +165,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P8-07 (Stretch) Kubernetes.** kustomize manifests tested on kind. *Verify:* all pods ready; smoke test passes.
 
 ### Phase 9 — Hardening and documentation
-- [ ] **P9-01 Profiling pass.** ETL and the slowest API queries (`EXPLAIN (ANALYZE, BUFFERS)`); indexes with evidence. *Verify:* before/after table in `reports/performance.md`.
+- [x] **P9-01 Profiling pass.** ETL and the slowest API queries (`EXPLAIN (ANALYZE, BUFFERS)`); indexes with evidence. *Verify:* before/after table in `reports/performance.md`.
 - [ ] **P9-02 Load test.** k6 or Locust scenarios (50 concurrent users). *Verify:* p95 numbers vs TRD §7 in `reports/performance.md`.
 - [ ] **P9-03 Security walk-through.** Complete SECURITY.md §11 checklist; document exceptions. *Verify:* ticked checklist committed.
 - [ ] **P9-04 README.** Five-command quick start, architecture diagram, screenshots, limitations, dataset citation and license, test instructions. *Verify:* a fresh clone follows it successfully.

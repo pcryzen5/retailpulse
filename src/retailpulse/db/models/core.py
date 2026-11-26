@@ -101,7 +101,10 @@ class DimCustomer(Base):
     """Pseudonymous customer dimension in core.dim_customer."""
 
     __tablename__ = "dim_customer"
-    __table_args__ = ({"schema": "core"},)
+    __table_args__ = (
+        Index("ix_dim_customer_last_order_date", text("last_order_date DESC")),
+        {"schema": "core"},
+    )
 
     customer_id: Mapped[int] = mapped_column(
         BigInteger().with_variant(Integer, "sqlite"),
@@ -169,6 +172,13 @@ class FactSalesLine(Base):
             postgresql_where=text("customer_id IS NOT NULL"),
         ),
         Index("ix_fsl_batch", "batch_id"),
+        Index(
+            "ix_fsl_date_agg",
+            "date_key",
+            "product_id",
+            "store_id",
+            postgresql_where=text("NOT is_outlier"),
+        ),
         {"schema": "core"},
     )
 
