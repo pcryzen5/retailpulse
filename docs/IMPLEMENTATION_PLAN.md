@@ -169,7 +169,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P9-02 Load test.** k6 or Locust scenarios (50 concurrent users). *Verify:* p95 numbers vs TRD §7 in `reports/performance.md`.
 - [x] **P9-03 Security walk-through.** Complete SECURITY.md §11 checklist; document exceptions. *Verify:* ticked checklist committed.
 - [x] **P9-04 README.** Five-command quick start, architecture diagram, screenshots, limitations, dataset citation and license, test instructions. *Verify:* a fresh clone follows it successfully.
-- [ ] **P9-05 Results report.** `reports/results.md` consolidating forecast, segments, churn, inventory, replay, limitations and reproduction steps. *Verify:* every number traceable to an MLflow run or report file.
+- [x] **P9-05 Results report.** `reports/results.md` consolidating forecast, segments, churn, inventory, replay, limitations and reproduction steps. *Verify:* every number traceable to an MLflow run or report file.
 - [ ] **P9-06 Release.** Demo script and recording; tag `v1.0.0`. *Verify:* PRD §11 checklist ticked.
 
 ---
