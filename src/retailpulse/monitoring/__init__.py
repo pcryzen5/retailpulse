@@ -39,7 +39,6 @@ from retailpulse.monitoring.performance import (
 )
 
 __all__ = [
-    "DriftAnalysisResult",
     "KIND_CHURN_DEGRADED",
     "KIND_DATA_QUALITY_FAILED",
     "KIND_DRIFT_DETECTED",
@@ -49,8 +48,9 @@ __all__ = [
     "KIND_FORECAST_NO_MODEL_BEATS_BASELINE",
     "KIND_PIPELINE_FAILED",
     "KIND_STOCKOUT_SPIKE",
-    "ModelPerformanceSnapshot",
     "VALID_SEVERITIES",
+    "DriftAnalysisResult",
+    "ModelPerformanceSnapshot",
     "compute_churn_drift",
     "compute_churn_realized_pr_auc",
     "compute_drift_report",

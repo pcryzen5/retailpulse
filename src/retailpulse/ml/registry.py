@@ -111,6 +111,7 @@ def promote_champion(
     model_name: str | None = None,
     tracking_uri: str | None = None,
     actor_id: uuid.UUID | None = None,
+    is_auto: bool = True,
 ) -> dict[str, Any]:
     """Promote a model version to 'champion' alias and update database mirrors.
 
@@ -169,6 +170,26 @@ def promote_champion(
             matching_run.mlflow_model_name = reg_name
             matching_run.mlflow_model_version = version
             target_run_id = matching_run.run_id
+
+            try:
+                from retailpulse.db.models.ops import AuditLog  # noqa: PLC0415
+
+                action_name = "promote (auto)" if is_auto else "promote"
+                audit_entry = AuditLog(
+                    action=action_name,
+                    user_id=actor_id,
+                    resource=f"model:{task}:{target_run_id}",
+                    details={
+                        "task": task,
+                        "model_name": reg_name,
+                        "champion_version": version,
+                        "previous_champion_version": previous_version,
+                        "is_auto": is_auto,
+                    },
+                )
+                session.add(audit_entry)
+            except Exception as audit_err:
+                logger.warning("Failed to record promotion audit log", error=str(audit_err))
 
         session.commit()
 

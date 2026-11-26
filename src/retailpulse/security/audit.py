@@ -13,6 +13,7 @@ Records auditable user and system actions in ops.audit_log:
 
 from __future__ import annotations
 
+import datetime
 import uuid
 from typing import Any
 
@@ -60,6 +61,7 @@ def log_audit(
     resource: str | None = None,
     details: dict[str, Any] | None = None,
     ip_address: str | None = None,
+    ts: datetime.datetime | None = None,
 ) -> AuditLog:
     """Create and append an audit trail record in ops.audit_log.
 
@@ -70,6 +72,7 @@ def log_audit(
         resource: Optional target resource identifier (e.g. 'model:forecast:run_id').
         details: Optional contextual metadata (passwords and tokens will be stripped).
         ip_address: Optional client IP address string.
+        ts: Optional timestamp; defaults to utc_now().
 
     Returns:
         The newly created AuditLog instance.
@@ -77,7 +80,7 @@ def log_audit(
     clean_details = sanitize_audit_details(details)
 
     log_entry = AuditLog(
-        ts=utc_now(),
+        ts=ts if ts is not None else utc_now(),
         user_id=user_id,
         action=action,
         resource=resource,

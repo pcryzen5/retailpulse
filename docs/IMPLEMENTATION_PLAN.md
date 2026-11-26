@@ -153,7 +153,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P7-05 Performance monitoring.** Realized WAPE for elapsed forecasts; churn PR-AUC after the outcome window; `ops.model_performance`. *Verify:* test with injected actuals.
 - [x] **P7-06 Alerts.** Rules and dedupe in `monitoring/alerts.py`; optional webhook (operator-set URL, timeout, no redirects). *Verify:* dedupe and webhook tests.
 - [x] **P7-07 Replay mode.** `retailpulse replay start --holdback-days 60` and `step`; runs 14 simulated days. *Verify:* `reports/replay_run.md` shows ≥ 95% flow success.
-- [ ] **P7-08 Retention and auto-promote.** Retention job per DATABASE §8; `RP_AUTO_PROMOTE` (default false) with tests. *Verify:* pruning keeps the active pointer's rows.
+- [x] **P7-08 Retention and auto-promote.** Retention job per DATABASE §8; `RP_AUTO_PROMOTE` (default false) with tests. *Verify:* pruning keeps the active pointer's rows.
 
 ### Phase 8 — CI/CD and deployment
 - [ ] **P8-01 Full CI.** Postgres service, integration tests, coverage gate 80%, concurrency cancel, caching. *Verify:* green PR; failing coverage blocks.

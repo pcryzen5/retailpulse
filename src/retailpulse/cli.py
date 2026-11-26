@@ -136,6 +136,82 @@ def db_seed_calendar(
     )
 
 
+@db_app.command("prune")
+def db_prune_command(
+    keep_dates: Annotated[
+        int,
+        typer.Option(
+            "--keep-dates",
+            help="Number of latest prediction scoring dates to keep per task (default: 14).",
+        ),
+    ] = 14,
+    audit_days: Annotated[
+        int,
+        typer.Option(
+            "--audit-days",
+            help="Retention horizon for audit logs in calendar days (default: 365).",
+        ),
+    ] = 365,
+    drift_days: Annotated[
+        int,
+        typer.Option(
+            "--drift-days",
+            help="Retention horizon for drift reports in calendar days (default: 180).",
+        ),
+    ] = 180,
+    upload_days: Annotated[
+        int,
+        typer.Option(
+            "--upload-days",
+            help="Retention horizon for raw upload files in calendar days (default: 30).",
+        ),
+    ] = 30,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output pruning results in JSON format.",
+        ),
+    ] = False,
+) -> None:
+    """Execute retention policy pruning per DATABASE §8."""
+    from retailpulse.db.retention import run_retention_job  # noqa: PLC0415
+
+    try:
+        with session_scope() as session:
+            summary = run_retention_job(
+                session=session,
+                keep_prediction_dates=keep_dates,
+                audit_retention_days=audit_days,
+                drift_retention_days=drift_days,
+                upload_retention_days=upload_days,
+            )
+        if json_output:
+            typer.echo(json.dumps(summary.to_dict(), indent=2))
+        else:
+            typer.secho(
+                "Retention cleanup completed successfully!",
+                fg=typer.colors.GREEN,
+                bold=True,
+            )
+            typer.echo(f"  Forecast rows pruned:         {summary.forecast_rows_pruned}")
+            typer.echo(f"  Customer segment rows pruned: {summary.customer_segment_rows_pruned}")
+            typer.echo(f"  Segment profile rows pruned:  {summary.segment_profile_rows_pruned}")
+            typer.echo(f"  Churn score rows pruned:      {summary.churn_score_rows_pruned}")
+            typer.echo(f"  Inventory rec rows pruned:    {summary.inventory_rec_rows_pruned}")
+            typer.echo(f"  Audit log rows pruned:        {summary.audit_log_rows_pruned}")
+            typer.echo(f"  Drift reports pruned:         {summary.drift_reports_pruned}")
+            typer.echo(f"  Drift HTML files deleted:     {summary.drift_files_deleted}")
+            typer.echo(f"  Raw upload files deleted:     {summary.upload_files_deleted}")
+            typer.secho(
+                f"  Total DB rows pruned:         {summary.total_rows_pruned}",
+                fg=typer.colors.CYAN,
+            )
+    except Exception as exc:
+        typer.secho(f"Retention pruning failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+
 etl_app = typer.Typer(
     name="etl",
     help="Data extraction, cleaning, loading, and aggregation commands.",

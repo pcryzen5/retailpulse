@@ -17,7 +17,6 @@ Implements P7-01:
 
 from __future__ import annotations
 
-import datetime
 import time
 import uuid
 from collections.abc import Callable
@@ -35,7 +34,8 @@ import retailpulse.ml.inventory.recommend as inv_rec
 import retailpulse.ml.segmentation.score as seg_score
 import retailpulse.ml.segmentation.train as seg_tr
 from retailpulse.config import get_settings
-from retailpulse.db.models.ops import Alert, DriftReport, PipelineRun
+from retailpulse.db.models.ops import PipelineRun
+from retailpulse.db.retention import prune_prediction_retention
 from retailpulse.db.session import session_scope
 from retailpulse.etl.aggregate import run_aggregation_pipeline
 from retailpulse.etl.calendar import (
@@ -252,12 +252,25 @@ def _run_score_all_flow(run_id: uuid.UUID, params: dict[str, Any]) -> dict[str, 
             "snapshot_id": inv_res.snapshot_id,
         }
 
+        # Step 5: Prediction tables retention pruning per DATABASE §8
+        retention_res = _execute_with_retry(
+            lambda: prune_prediction_retention(session, keep_dates=14),
+            step_name="score_all:retention",
+        )
+        results["retention"] = retention_res
+
     return results
 
 
 def _run_train_forecast_flow(run_id: uuid.UUID, params: dict[str, Any]) -> dict[str, Any]:
     """Train demand forecast candidates across backtest windows and register winning model."""
     del run_id
+    settings = get_settings()
+    eff_auto_promote = (
+        params.get("auto_promote")
+        if params.get("auto_promote") is not None
+        else settings.auto_promote
+    )
     with session_scope() as session:
         res = _execute_with_retry(
             lambda: fc_tr.train_forecast_pipeline(
@@ -265,7 +278,7 @@ def _run_train_forecast_flow(run_id: uuid.UUID, params: dict[str, Any]) -> dict[
                 n_folds=params.get("n_folds", 5),
                 horizon=params.get("horizon", 28),
                 top_n=params.get("top_n", 300),
-                auto_promote=params.get("auto_promote", False),
+                auto_promote=eff_auto_promote,
             ),
             step_name="train_forecast",
         )
@@ -280,12 +293,18 @@ def _run_train_forecast_flow(run_id: uuid.UUID, params: dict[str, Any]) -> dict[
 def _run_train_segmentation_flow(run_id: uuid.UUID, params: dict[str, Any]) -> dict[str, Any]:
     """Train customer segmentation clustering and register candidate model."""
     del run_id
+    settings = get_settings()
+    eff_auto_promote = (
+        params.get("auto_promote")
+        if params.get("auto_promote") is not None
+        else settings.auto_promote
+    )
     with session_scope() as session:
         res = _execute_with_retry(
             lambda: seg_tr.train_segmentation_pipeline(
                 session,
                 k=params.get("k"),
-                auto_promote=params.get("auto_promote", False),
+                auto_promote=eff_auto_promote,
             ),
             step_name="train_segmentation",
         )
@@ -300,12 +319,18 @@ def _run_train_segmentation_flow(run_id: uuid.UUID, params: dict[str, Any]) -> d
 def _run_train_churn_flow(run_id: uuid.UUID, params: dict[str, Any]) -> dict[str, Any]:
     """Train customer churn classifier and evaluate against gate thresholds."""
     del run_id
+    settings = get_settings()
+    eff_auto_promote = (
+        params.get("auto_promote")
+        if params.get("auto_promote") is not None
+        else settings.auto_promote
+    )
     with session_scope() as session:
         res = _execute_with_retry(
             lambda: churn_tr.train_churn_pipeline(
                 session,
                 churn_window_days=params.get("churn_window_days", 90),
-                auto_promote=params.get("auto_promote", False),
+                auto_promote=eff_auto_promote,
             ),
             step_name="train_churn",
         )
