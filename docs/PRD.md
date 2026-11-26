@@ -205,14 +205,14 @@ Targets are goals to validate, not guarantees. If a target is missed, report the
 
 ## 11. Release criteria for v1.0
 
-- [ ] All P0 requirements implemented and traceable to tests.
-- [ ] Full dataset loads in under 10 minutes on the reference machine (TRD §7).
-- [ ] Backtest, churn, segmentation and inventory-simulation reports generated and committed under `reports/`.
-- [ ] Champion gate demonstrated (a model passes, and a deliberately bad model is rejected in a test).
-- [ ] Nightly and weekly flows run unattended for 14 simulated days (replay mode).
-- [ ] CI green with coverage and security gates; images build and deploy to the target host.
-- [ ] Security checklist in SECURITY.md fully ticked or exceptions documented.
-- [ ] README explains setup in five commands or fewer.
+- [x] All P0 requirements implemented and traceable to tests. *(Verified across Phases 0–9; full test suite passing).*
+- [x] Full dataset loads in under 10 minutes on the reference machine (TRD §7). *(Verified in `reports/etl_benchmark.md`: 1,027,458 rows loaded in 4.1 min).*
+- [x] Backtest, churn, segmentation and inventory-simulation reports generated and committed under `reports/`. *(Verified: `reports/forecast_backtest.md`, `reports/churn_and_segments.md`, `reports/inventory_simulation.md`, `reports/results.md`).*
+- [x] Champion gate demonstrated (a model passes, and a deliberately bad model is rejected in a test). *(Verified in `tests/unit/test_promotion_and_rollback.py`: gate passes qualifying models, rejects sub-par models with 422).*
+- [x] Nightly and weekly flows run unattended for 14 simulated days (replay mode). *(Verified in `reports/replay_run.md`: 14 simulated days, 54/54 flows succeeded, 100% flow success).*
+- [x] CI green with coverage and security gates; images build and deploy to the target host. *(Verified in `.github/workflows/ci.yml`, `cd.yml`, `security.yml`; Dockerfile and compose production deploy verified).*
+- [x] Security checklist in SECURITY.md fully ticked or exceptions documented. *(Verified in `docs/SECURITY.md §11` and §12 exceptions log; confirmed by `tests/unit/test_secrets_handling.py`).*
+- [x] README explains setup in five commands or fewer. *(Verified in `README.md §2`: 5-command quickstart, verified by `tests/unit/test_readme.py`).*
 
 ## 12. Risks and mitigations
 
