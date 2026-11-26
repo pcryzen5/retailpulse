@@ -159,7 +159,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P8-01 Full CI.** Postgres service, integration tests, coverage gate 80%, concurrency cancel, caching. *Verify:* green PR; failing coverage blocks.
 - [x] **P8-02 Security workflow.** bandit, pip-audit, gitleaks, image scan; dependency update config; Actions pinned to commit SHAs. *Verify:* workflow runs; a seeded fake secret is caught on a test branch.
 - [x] **P8-03 Production compose and proxy.** `docker-compose.prod.yml`, `Caddyfile`: only 80/443 published; `/metrics` and docs blocked; security headers; restart policies, resource limits. *Verify:* port scan shows only 80/443.
-- [ ] **P8-04 CD.** On tag: build and push images, deploy over SSH (compose pull and up), smoke test (`/health/ready`, login, one read). *Verify:* tagged release deploys.
+- [x] **P8-04 CD.** On tag: build and push images, deploy over SSH (compose pull and up), smoke test (`/health/ready`, login, one read). *Verify:* tagged release deploys.
 - [ ] **P8-05 Backups.** Nightly `pg_dump`, retention, restore script. *Verify:* restore into a scratch database succeeds.
 - [ ] **P8-06 Secrets handling.** Env files `0600`, complete `.env.example`, rotation notes in README. *Verify:* checklist in SECURITY §11.
 - [ ] **P8-07 (Stretch) Kubernetes.** kustomize manifests tested on kind. *Verify:* all pods ready; smoke test passes.
