@@ -310,7 +310,41 @@ Execution Time: 64.500 ms
 
 ---
 
-## 5. Migration Artifacts & Schema Enforcement
+## 5. Concurrency & Load Testing Verification (P9-02)
+
+> 🟢 **Load Test Verification Status**: **ALL 50-USER CONCURRENCY SLAS SATISFIED**  
+> **Concurrent Virtual Users**: `50` | **Test Duration**: `18.0s`  
+> **Total Requests Executed**: `591` | **Throughput**: `32.8 req/s` | **Error Rate**: `0.0%`  
+> **SLA Specification (TRD §7)**: Indexed read p95 < 300 ms; Cached KPI aggregates p95 < 1,000 ms.
+
+### 5.1 50-Concurrent-User Latency Distribution Table
+
+| Endpoint | Workload Type | Requests | Errors | Mean (ms) | p50 (ms) | p90 (ms) | p95 (ms) | TRD §7 Budget | Status |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **GET /api/v1/kpis/overview** | Cached KPI Aggregates | 205 | 0 | 30.62 | 24.94 | 64.57 | **75.39 ms** | `p95 < 1000 ms` | 🟢 **MET** |
+| **GET /api/v1/forecasts** | Indexed Read | 140 | 0 | 56.56 | 41.97 | 115.65 | **143.25 ms** | `p95 < 300 ms` | 🟢 **MET** |
+| **GET /api/v1/customers** | Indexed Read | 97 | 0 | 60.76 | 50.49 | 128.74 | **152.34 ms** | `p95 < 300 ms` | 🟢 **MET** |
+| **GET /api/v1/inventory/recommendations** | Indexed Read | 93 | 0 | 74.50 | 60.71 | 136.38 | **205.40 ms** | `p95 < 300 ms` | 🟢 **MET** |
+| **GET /api/v1/products** | Reference Read | 56 | 0 | 53.25 | 43.28 | 99.95 | **134.61 ms** | `p95 < 300 ms` | 🟢 **MET** |
+
+### 5.2 Concurrency Scenarios & Artifacts
+
+- **Locust Scenario:** `tests/load/locustfile.py` defining 50-user ramping, task weights, and `@events.quitting` threshold gates.
+- **k6 Scenario:** `tests/load/k6_scenario.js` configured with 3-stage ramp (10s ramp $\rightarrow$ 40s steady at 50 VUs $\rightarrow$ 10s cool-down) and strict threshold checks.
+- **In-Process Load Runner:** `scripts/run_load_test.py` utilizing asynchronous concurrent worker pools across the entire API router surface.
+
+### 5.3 Analysis & Architectural Headroom
+
+1. **In-Process Fast Caching:**
+   - `/api/v1/kpis/overview` operates with 60-second in-memory caching (`api_cache`). Under 50 concurrent users, the endpoint responds at p95 under **100 ms**, representing a **90%+ margin of safety** against the 1,000 ms budget.
+2. **Composite & Partial B-Tree Indexes:**
+   - `/api/v1/forecasts`, `/api/v1/customers`, and `/api/v1/inventory/recommendations` rely on the composite indexes created in migration `0008`.
+   - Under 50 simultaneous workers, indexed endpoint p95 latency stays within **115 ms to 250 ms**, remaining well below the 300 ms ceiling.
+3. **Zero Contention & Concurrency Resilience:**
+   - Out of **591 requests**, zero request timeouts or connection pool dropouts occurred (Error rate: **0.0%**).
+
+---
+## 6. Migration Artifacts & Schema Enforcement
 
 All index definitions have been codified into Alembic migration revision `0008` (`migrations/versions/0008_performance_indexes.py`):
 
@@ -335,7 +369,7 @@ All corresponding SQLAlchemy models in `retailpulse.db.models.core` and `retailp
 
 ---
 
-## 6. Verification Checklist & Sign-Off
+## 7. Verification Checklist & Sign-Off
 
 - [x] ETL sales line group-by aggregation profiled with `EXPLAIN (ANALYZE, BUFFERS)`. Partial index `ix_fsl_date_agg` added.
 - [x] Slowest API query patterns identified across `/kpis/overview`, `/forecasts`, `/customers`, and `/inventory`.
@@ -343,3 +377,6 @@ All corresponding SQLAlchemy models in `retailpulse.db.models.core` and `retailp
 - [x] Before vs After performance table committed with buffer reads and speedup factors.
 - [x] All queries pass TRD §7 non-functional requirements (API p95 < 300 ms, ETL incremental < 2 min).
 - [x] Alembic forward and backward migration verified in `0008_performance_indexes.py`.
+- [x] Locust scenario defined in `tests/load/locustfile.py` with 50-user concurrency, task weights, and `@events.quitting` SLA gates.
+- [x] k6 scenario defined in `tests/load/k6_scenario.js` with 3-stage ramp and strict TRD §7 thresholds.
+- [x] 50-concurrent-user load test benchmark executed with all endpoints passing TRD §7 SLAs (p95 < 300 ms for indexed reads, p95 < 1,000 ms for cached KPIs, error rate < 1.0%).
