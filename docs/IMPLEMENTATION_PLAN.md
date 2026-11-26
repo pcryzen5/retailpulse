@@ -162,7 +162,7 @@ This is the build checklist. Work top to bottom, one task at a time. Tick a box 
 - [x] **P8-04 CD.** On tag: build and push images, deploy over SSH (compose pull and up), smoke test (`/health/ready`, login, one read). *Verify:* tagged release deploys.
 - [x] **P8-05 Backups.** Nightly `pg_dump`, retention, restore script. *Verify:* restore into a scratch database succeeds.
 - [x] **P8-06 Secrets handling.** Env files `0600`, complete `.env.example`, rotation notes in README. *Verify:* checklist in SECURITY §11.
-- [ ] **P8-07 (Stretch) Kubernetes.** kustomize manifests tested on kind. *Verify:* all pods ready; smoke test passes.
+- [x] **P8-07 (Stretch) Kubernetes.** kustomize manifests tested on kind. *Verify:* all pods ready; smoke test passes.
 
 ### Phase 9 — Hardening and documentation
 - [ ] **P9-01 Profiling pass.** ETL and the slowest API queries (`EXPLAIN (ANALYZE, BUFFERS)`); indexes with evidence. *Verify:* before/after table in `reports/performance.md`.
