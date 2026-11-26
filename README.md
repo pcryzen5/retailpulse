@@ -65,3 +65,38 @@ uv run uvicorn retailpulse.api.main:app --reload
 # Start Streamlit Dashboard
 uv run streamlit run src/retailpulse/dashboard/app.py
 ```
+
+---
+
+## Secrets Handling & Rotation
+
+RetailPulse implements strict secrets isolation and defense-in-depth controls per `docs/SECURITY.md`:
+
+### 1. File Permissions & Environment Isolation (SEC-CFG-01)
+- Live configuration files (e.g. `.env`) must be restricted to read/write by the owner only:
+  ```bash
+  chmod 0600 .env
+  ```
+- `.env` is explicitly ignored by git. Never commit `.env` or plain-text secrets into repository history.
+- In production (`RP_ENV=prod`), application startup **fails immediately** if any cryptographic secret is missing, shorter than 32 characters, or identical to development template values (`SEC-CFG-02`).
+
+### 2. Secret Generation (SEC-CFG-01)
+Generate high-entropy cryptographically secure tokens (48+ url-safe bytes) using Python's `secrets` module:
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+### 3. Secret Rotation Procedures (SECURITY §12)
+- **JWT Secret (`RP_JWT_SECRET`) Rotation**:
+  1. Generate a new 48-byte secret and update `.env` or deployment secret store.
+  2. Restart the `api` service (`docker compose -f docker-compose.prod.yml restart api`).
+  3. All existing user sessions will be invalidated immediately, requiring users to log in again.
+- **Database Passwords (`RP_DB_APP_PASSWORD`, `RP_DB_OWNER_PASSWORD`) Rotation**:
+  1. Execute `ALTER ROLE rp_app WITH PASSWORD 'new_password';` in PostgreSQL.
+  2. Update `RP_DATABASE_URL` in `.env` and restart `api` and `worker` services.
+- **Customer Pseudonymization Salt (`RP_PSEUDONYM_SALT`) Rotation (SEC-DATA-01)**:
+  1. The salt is used for HMAC-SHA256 pseudonymization of source customer identifiers.
+  2. Rotating `RP_PSEUDONYM_SALT` requires executing the customer re-key migration to recompute surrogate hashes across `core.dim_customer`, `core.fact_sales_line`, and `ml.churn_score`. Schedule during planned maintenance.
+- **Leaked Secret Incident Response (SEC-CFG-05, SECURITY §12)**:
+  - If a secret is leaked, immediately rotate the credential in production, audit `ops.audit_log` to inspect access history, and remove the secret from git history using a rewrite tool.
+
