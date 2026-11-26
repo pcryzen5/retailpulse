@@ -1,0 +1,233 @@
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: retailpulse_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      dashboard:
+        condition: service_healthy
+    networks:
+      - retailpulse_net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: retailpulse_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      RP_DB_OWNER_PASSWORD: ${RP_DB_OWNER_PASSWORD}
+      RP_DB_APP_PASSWORD: ${RP_DB_APP_PASSWORD}
+      MLFLOW_DB_PASSWORD: ${MLFLOW_DB_PASSWORD}
+      PREFECT_DB_PASSWORD: ${PREFECT_DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - retailpulse_net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: infra/docker/mlflow.Dockerfile
+    container_name: retailpulse_mlflow
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://mlflow:${MLFLOW_DB_PASSWORD}@postgres:5432/mlflow
+      MLFLOW_DEFAULT_ARTIFACT_ROOT: /mlflow/artifacts
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://mlflow:${MLFLOW_DB_PASSWORD}@postgres:5432/mlflow
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - retailpulse_net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  prefect:
+    image: prefecthq/prefect:3-python3.11
+    container_name: retailpulse_prefect
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_SERVER_API_PORT: 4200
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://prefect:${PREFECT_DB_PASSWORD}@postgres:5432/prefect
+    command: prefect server start
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - retailpulse_net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/worker.Dockerfile
+    container_name: retailpulse_worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+      prefect:
+        condition: service_healthy
+    environment:
+      RP_ENV: prod
+      RP_DATABASE_URL: postgresql+psycopg://rp_app:${RP_DB_APP_PASSWORD}@postgres:5432/retailpulse
+      DATABASE_URL: postgresql+psycopg://rp_app:${RP_DB_APP_PASSWORD}@postgres:5432/retailpulse
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      RP_MLFLOW_TRACKING_URI: http://mlflow:5000
+      PREFECT_API_URL: http://prefect:4200/api
+      RP_PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_HOME: /tmp/.prefect
+      RP_JWT_SECRET: ${RP_JWT_SECRET}
+      RP_PSEUDONYM_SALT: ${RP_PSEUDONYM_SALT}
+      RP_AUTO_PROMOTE: "false"
+    volumes:
+      - ./data:/app/data
+    networks:
+      - retailpulse_net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: retailpulse_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      prefect:
+        condition: service_healthy
+    environment:
+      RP_ENV: prod
+      RP_DATABASE_URL: postgresql+psycopg://rp_app:${RP_DB_APP_PASSWORD}@postgres:5432/retailpulse
+      DATABASE_URL: postgresql+psycopg://rp_app:${RP_DB_APP_PASSWORD}@postgres:5432/retailpulse
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      RP_MLFLOW_TRACKING_URI: http://mlflow:5000
+      PREFECT_API_URL: http://prefect:4200/api
+      RP_PREFECT_API_URL: http://prefect:4200/api
+      RP_PIPELINE_TRIGGER: prefect
+      RP_ENABLE_DOCS: "false"
+      RP_JWT_SECRET: ${RP_JWT_SECRET}
+      RP_PSEUDONYM_SALT: ${RP_PSEUDONYM_SALT}
+      PREFECT_HOME: /tmp/.prefect
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - retailpulse_net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1G
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: infra/docker/dashboard.Dockerfile
+    container_name: retailpulse_dashboard
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      RP_API_URL: http://api:8000
+      STREAMLIT_SERVER_PORT: 8501
+      STREAMLIT_SERVER_ADDRESS: 0.0.0.0
+      STREAMLIT_SERVER_HEADLESS: "true"
+      STREAMLIT_SERVER_ENABLE_CORS: "false"
+      STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION: "true"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - retailpulse_net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+volumes:
+  postgres_data:
+    name: retailpulse_prod_postgres_data
+  mlflow_artifacts:
+    name: retailpulse_prod_mlflow_artifacts
+  caddy_data:
+    name: retailpulse_prod_caddy_data
+  caddy_config:
+    name: retailpulse_prod_caddy_config
+
+networks:
+  retailpulse_net:
+    name: retailpulse_prod_net
+    driver: bridge

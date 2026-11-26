@@ -1,0 +1,86 @@
+# RetailPulse Caddyfile for Production Edge Proxy
+# Enforces SEC-WEB-01, SEC-WEB-02, SEC-WEB-05, SEC-WEB-06
+
+{
+	# Global options
+	admin off
+	auto_https disable_redirects
+}
+
+:80 {
+	# Enforce security response headers across all endpoints (SEC-WEB-01)
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		# Cache-Control: no-store on sensitive API endpoints
+		-Server
+	}
+
+	# Block metrics and technical monitoring from external internet (SEC-WEB-05)
+	respond /metrics* 403 {
+		body "Forbidden: metrics are internal-only"
+	}
+
+	# Block API documentation routes in production edge (SEC-WEB-05)
+	respond /docs* 403 {
+		body "Forbidden: API documentation is disabled in production"
+	}
+	respond /redoc* 403 {
+		body "Forbidden: API documentation is disabled in production"
+	}
+	respond /openapi.json* 403 {
+		body "Forbidden: OpenAPI specification is disabled in production"
+	}
+
+	# Sandboxed CSP header specifically for drift reports (SEC-WEB-06)
+	@driftReports path /api/v1/monitoring/drift/report/*
+	header @driftReports {
+		Content-Security-Policy "sandbox; default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
+	}
+
+	# Route /api/* to FastAPI backend
+	handle /api/* {
+		# Limit upload body size to 50MB (SEC-INP-03)
+		request_body {
+			max_size 52428800
+		}
+		reverse_proxy api:8000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	# Route /health to API health check
+	handle /health* {
+		reverse_proxy api:8000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	# Route Streamlit WebSocket connections for live interactivity
+	handle /_stcore/stream* {
+		reverse_proxy dashboard:8501 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	# Default route to Streamlit dashboard
+	handle {
+		reverse_proxy dashboard:8501 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+}
