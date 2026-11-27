@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Dockerfile for MLflow tracking and registry server
 
-FROM python:3.11.9-slim-bookworm
+FROM python:3.15.1-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
