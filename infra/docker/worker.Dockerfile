@@ -2,7 +2,7 @@
 # Multi-stage Dockerfile for RetailPulse Worker service (Full ML Workload)
 
 FROM ghcr.io/astral-sh/uv:0.5.21 AS uv_bin
-FROM python:3.11.9-slim-bookworm AS builder
+FROM python:3.15.1-slim-bookworm AS builder
 
 COPY --from=uv_bin /uv /uvx /bin/
 
@@ -30,7 +30,7 @@ COPY src/ /app/src/
 RUN uv sync --frozen --no-dev --group core --group ml --group api
 
 # Final runtime image
-FROM python:3.11.9-slim-bookworm AS runtime
+FROM python:3.15.1-slim-bookworm AS runtime
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
