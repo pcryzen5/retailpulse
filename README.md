@@ -31,6 +31,61 @@ uv run alembic upgrade head && uv run retailpulse users create-admin --username 
 uv run retailpulse etl run && uv run retailpulse score && docker compose -f docker-compose.prod.yml up -d
 ```
 
+### Detailed Run Instructions (Local Development & Testing)
+
+If you prefer running services individually for local development or step-by-step exploration:
+
+#### Step 1: Start Backing Services (Database & Cache)
+```bash
+docker compose up -d db redis
+```
+This starts:
+- **PostgreSQL 16** on `localhost:5432` (`retailpulse`, `mlflow`, and `prefect` databases)
+- **Redis 7.2** on `localhost:6379` (caching and rate-limiting)
+
+#### Step 2: Install Dependencies & Run Database Migrations
+```bash
+uv sync --frozen
+uv run alembic upgrade head
+```
+
+#### Step 3: Ingest Data & Score Models
+Ingest the historical UCI Online Retail II dataset, seed inventory parameters, and compute forecasts and churn risk:
+```bash
+# Ingest raw transactions
+uv run retailpulse etl run --source online_retail_ii --path data/raw/online_retail_II.xlsx
+
+# Seed synthetic inventory optimization parameters
+uv run retailpulse inventory seed-params
+
+# Compute demand forecasts, customer segments, churn scores, and inventory policies
+uv run retailpulse score all
+```
+
+#### Step 4: Launch the Applications
+Open two terminals to run the backend and frontend:
+
+- **Terminal 1: FastAPI REST Service**
+  ```bash
+  uv run retailpulse api
+  ```
+  Swagger API Docs: `http://localhost:8000/docs` | Health: `http://localhost:8000/health/ready`
+
+- **Terminal 2: Streamlit Analytics Dashboard**
+  ```bash
+  uv run retailpulse dashboard
+  ```
+  Interactive Dashboard: `http://localhost:8501`
+
+#### Default RBAC Test Credentials
+| Role | Username | Password | Permitted Actions |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `admin@retailpulse.local` | `AdminPass123!` | Full control, user administration, model promotion |
+| **Demand Planner** | `planner@retailpulse.local` | `PlannerPass123!` | Forecast visualization, model tournament inspection |
+| **Inventory Manager** | `inventory@retailpulse.local` | `InventoryPass123!`| Inventory policies, PO simulation & safety stock overrides |
+| **Marketing Analyst** | `marketing@retailpulse.local` | `MarketingPass123!`| RFM customer segments, churn risk & survival curves |
+| **Viewer** | `viewer@retailpulse.local` | `ViewerPass123!` | Read-only access to executive KPI overviews |
+
 > **Access Points:**
 > - **Web Application (Caddy Edge):** `https://localhost` (or `http://localhost`)
 > - **FastAPI REST API:** `http://localhost:8000` (Documentation at `/docs` in development mode)
