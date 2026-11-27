@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Multi-stage Dockerfile for RetailPulse Worker service (Full ML Workload)
 
-FROM ghcr.io/astral-sh/uv:0.5.21 AS uv_bin
+FROM ghcr.io/astral-sh/uv:0.13.10 AS uv_bin
 FROM python:3.11.9-slim-bookworm AS builder
 
 COPY --from=uv_bin /uv /uvx /bin/
